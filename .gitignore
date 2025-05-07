@@ -1,0 +1,35 @@
+# Node.js (Svelte frontend)
+frontend/web/node_modules/
+frontend/web/.svelte-kit/
+frontend/web/build/
+frontend/web/.env.local
+frontend/web/.env.*
+
+# SurrealDB (local DB file)
+backend/db/*.db
+
+# General .env files
+.env
+.env.*
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Editor files
+.idea/
+.vscode/
+*.swp
+*~
+
+# Build artifacts
+/dist
+/build
+/target
