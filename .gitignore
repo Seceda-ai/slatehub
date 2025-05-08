@@ -6,7 +6,7 @@ frontend/web/.env.local
 frontend/web/.env.*
 
 # SurrealDB (local DB file)
-backend/db/*.db
+backend/db/data/*.db
 
 # General .env files
 .env
@@ -33,3 +33,4 @@ Thumbs.db
 /dist
 /build
 /target
+history.txt

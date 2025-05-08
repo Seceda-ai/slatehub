@@ -1,0 +1,17 @@
+services:
+  db:
+    image: surrealdb/surrealdb:latest
+    container_name: surreal
+    environment:
+      - SURREAL_USER=${SURREAL_USER}
+      - SURREAL_PASS=${SURREAL_PASS}
+    volumes:
+      - ./backend/db:/surrealdb
+    command: >
+      start --log trace
+      --user ${SURREAL_USER}
+      --pass ${SURREAL_PASS}
+      --bind 0.0.0.0:8000
+      file:///surrealdb/data/db.db
+    ports:
+      - "8000:8000"
