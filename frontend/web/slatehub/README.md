@@ -36,7 +36,7 @@ pnpm install
 3. Create a `.env` file in this directory with the following content:
 
 ```
-VITE_SURREAL_URL=http://localhost:8000
+VITE_SURREAL_URL=http://localhost:8000/rpc
 VITE_SURREAL_NS=seceda
 VITE_SURREAL_DB=core
 ```
@@ -80,12 +80,41 @@ pnpm preview
 - `src/lib/styles`: Global and component-specific styles
 - `src/routes`: Page components for each route
 
-## Authentication Flow
+## SurrealDB Integration
 
-1. User signs up through `/signup` page
-2. Authentication token is stored in localStorage
-3. Protected routes check auth status before rendering
-4. AuthGuard component handles redirects for unauthenticated users
+We use the official `surrealdb` JavaScript client to connect to the SurrealDB backend. The integration:
+
+1. Establishes a persistent connection with proper namespace and database
+2. Handles authentication tokens with localStorage persistence
+3. Provides utility functions for database queries
+4. Manages connection and authentication state using Svelte stores
+
+### Database Configuration
+
+The connection parameters are read from environment variables:
+
+```
+VITE_SURREAL_URL=http://localhost:8000/rpc  (Must include /rpc)
+VITE_SURREAL_NS=seceda                     (Namespace)
+VITE_SURREAL_DB=core                       (Database name)
+```
+
+### Authentication Flow
+
+1. User signs up through `/signup` page using `signup()` function
+2. User signs in with `signin()` function which obtains an authentication token
+3. Token is stored in localStorage for persistence
+4. Protected routes check auth status before rendering
+5. AuthGuard component handles redirects for unauthenticated users
+
+## Debugging
+
+Slatehub includes comprehensive debugging tools to help troubleshoot SurrealDB authentication and query issues:
+
+1. **Debug Console**: Visit `/debug` to test connections, authentication, and queries
+2. **Enhanced Error Display**: Detailed error information in forms
+3. **Developer Debug Panel**: Floating debug panel in development mode
+4. **Console Logging**: Extensive logging for troubleshooting
 
 ## Customization
 
@@ -109,43 +138,6 @@ Global CSS variables are defined in `src/app.css`. You can modify these to chang
   <!-- Your page content here -->
 </AuthGuard>
 ```
-
-## Debugging
-
-Slatehub includes comprehensive debugging tools to help you troubleshoot SurrealDB authentication and query issues:
-
-### 1. Enhanced Error Display
-
-The login and signup forms now display detailed error information, including:
-- Error message
-- Error code
-- Detailed description of the problem
-- Raw error data when available
-
-### 2. SurrealDebug Component
-
-In development mode, a floating debug panel is available at the bottom right of the screen:
-- Shows current connection status
-- Displays authentication state
-- Provides detailed error information
-- Can be expanded/collapsed as needed
-
-### 3. Debug Console
-
-A dedicated debug route at `/debug` provides a comprehensive testing interface:
-- Test database connections
-- Try authentication operations (signup, signin, signout)
-- Execute custom SurrealQL queries
-- View detailed error information
-- Monitor operation timing
-
-### 4. Console Logging
-
-Enhanced error logging in the browser console provides additional context for troubleshooting:
-- Connection errors
-- Authentication errors
-- Query errors
-- Raw error data for detailed inspection
 
 ## Contributing
 
