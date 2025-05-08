@@ -1,38 +1,123 @@
-# sv
+# Slatehub Frontend
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+This is the Svelte-based frontend for Slatehub, an open-source production management tool for film, TV, commercial, and social video projects.
 
-## Creating a project
+## Features
 
-If you're seeing this, you've probably already done this step. Congrats!
+- **Authentication System**: Sign up, sign in, and sign out functionality
+- **SurrealDB Integration**: Direct connection to SurrealDB backend
+- **Profile Management**: User profile information display
+- **Responsive Design**: Works on desktop and mobile devices
+- **Role-Based Access Control**: Different views and permissions for different user roles
+
+## Prerequisites
+
+- Node.js (v18+)
+- npm or pnpm
+- Running SurrealDB instance (see main project README)
+
+## Installation
+
+1. Navigate to the frontend directory:
 
 ```bash
-# create a new project in the current directory
-npx sv create
-
-# create a new project in my-app
-npx sv create my-app
+cd slatehub/frontend/web/slatehub
 ```
 
-## Developing
+2. Install dependencies:
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+```bash
+npm install
+# or
+pnpm install
+```
+
+3. Create a `.env` file in this directory with the following content:
+
+```
+VITE_SURREAL_URL=http://localhost:8000
+VITE_SURREAL_NS=seceda
+VITE_SURREAL_DB=core
+```
+
+Adjust these values if your SurrealDB is running on a different URL or with different namespace/database names.
+
+## Development
+
+To start the development server:
 
 ```bash
 npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
+# or
+pnpm dev
 ```
 
-## Building
+This will start the development server at [http://localhost:5173](http://localhost:5173).
 
-To create a production version of your app:
+## Building for Production
+
+To create a production build:
 
 ```bash
 npm run build
+# or
+pnpm build
 ```
 
-You can preview the production build with `npm run preview`.
+To preview the production build:
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+```bash
+npm run preview
+# or
+pnpm preview
+```
+
+## Project Structure
+
+- `src/lib/db`: SurrealDB connection and auth management
+- `src/lib/components`: Reusable UI components
+- `src/lib/styles`: Global and component-specific styles
+- `src/routes`: Page components for each route
+
+## Authentication Flow
+
+1. User signs up through `/signup` page
+2. Authentication token is stored in localStorage
+3. Protected routes check auth status before rendering
+4. AuthGuard component handles redirects for unauthenticated users
+
+## Customization
+
+### Styling
+
+Global CSS variables are defined in `src/app.css`. You can modify these to change the overall look and feel of the application.
+
+### Adding New Pages
+
+1. Create a new folder in `src/routes/`
+2. Add a `+page.svelte` file in the folder
+3. Wrap your page content with the AuthGuard component if authentication is required:
+
+```svelte
+<script>
+  import AuthGuard from '$lib/components/AuthGuard.svelte';
+  // other imports
+</script>
+
+<AuthGuard requireAuth={true}>
+  <!-- Your page content here -->
+</AuthGuard>
+```
+
+## Contributing
+
+Please follow these guidelines when contributing to the project:
+
+1. Use descriptive commit messages
+2. Maintain the existing code style
+3. Add comments for complex logic
+4. Create components for reusable UI elements
+
+## License
+
+This project is open-source under the MIT License.

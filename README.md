@@ -70,6 +70,11 @@ slatehub/
      ```bash
      cd frontend/web/slatehub
      npm install
+     # Set up frontend environment variables
+     cp ../../.env .env
+     echo "VITE_SURREAL_URL=http://localhost:8000" >> .env
+     echo "VITE_SURREAL_NS=${SURREAL_NS:-seceda}" >> .env
+     echo "VITE_SURREAL_DB=${SURREAL_DB:-core}" >> .env
      cd -
      ```
 
@@ -115,6 +120,12 @@ make start-frontend
 ```
 
 Starts the Svelte dev server, usually on `http://localhost:5173`.
+
+The frontend includes:
+- Complete authentication system (signup/signin)
+- SurrealDB integration via client-side API
+- Profile management
+- Responsive design for desktop and mobile
 
 ### All‑in‑one for development
 
