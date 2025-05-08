@@ -32,14 +32,27 @@ slatehub/
 ├── backend/
 │   └── db/
 │       ├── data/                # SurrealDB data files
-│       ├── seed_admin_org.surql # SQL script to seed organization and membership
 │       └── schema.surql         # SurrealDB schema definitions
 ├── frontend/
-│   └── web/                     # Svelte application slatehub
-├── .env-example                 # Environment variable template
-├── docker-compose.yml           # SurrealDB service definition
-├── Makefile                     # Development and seeding commands
-└── README.md                    # This file
+│   └── web/
+│       └── slatehub/           # Svelte application frontend
+│           ├── src/
+│           │   ├── lib/        # Library code
+│           │   │   ├── components/  # UI components
+│           │   │   ├── db/     # Database connection
+│           │   │   └── styles/ # CSS stylesheets
+│           │   ├── routes/     # Application routes
+│           │   │   ├── debug/  # Debug utilities
+│           │   │   ├── login/  # Authentication
+│           │   │   ├── profile/ # User profile
+│           │   │   └── signup/ # User registration
+│           │   └── app.css     # Global styles
+│           ├── AUTH.md         # Auth documentation
+│           └── README.md       # Frontend docs
+├── .env-example                # Environment template
+├── docker-compose.yml          # SurrealDB container
+├── Makefile                    # Development commands
+└── README.md                   # This file
 ```
 
 ---
