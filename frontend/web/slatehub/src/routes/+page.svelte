@@ -1,18 +1,18 @@
 <script>
-    import { authState, connect } from '$lib/db/surreal';
-    import { onMount } from 'svelte';
-    import { goto } from '$app/navigation';
+    import { authState, connect } from "$lib/db/surreal";
+    import { onMount } from "svelte";
+    import { goto } from "$app/navigation";
 
-    let welcomeMessage = "Welcome to Slatehub";
+    let welcomeMessage = "AI-Powered Production Management";
     let showDebugInfo = false;
-    
+
     onMount(async () => {
         // Try to connect to the database on page load
-        const dbUrl = import.meta.env.VITE_SURREAL_URL || 'http://localhost:8000';
-        await connect(dbUrl);
-        
+        await connect();
+
         // Only show debug info in development mode
-        showDebugInfo = import.meta.env.DEV || import.meta.env.MODE === 'development';
+        showDebugInfo =
+            import.meta.env.DEV || import.meta.env.MODE === "development";
     });
 </script>
 
@@ -20,7 +20,8 @@
     {#if showDebugInfo}
         <div class="debug-notice">
             <p>
-                <strong>Developer Mode:</strong> Having authentication issues? Visit the 
+                <strong>Developer Mode:</strong> Having authentication issues?
+                Visit the
                 <a href="/debug">Debug Console</a> to troubleshoot SurrealDB connections.
             </p>
         </div>
@@ -28,21 +29,39 @@
     <div class="hero">
         <h1>{welcomeMessage}</h1>
         <p class="subtitle">
-            An open-source film, TV, commercial, and social video production management tool
+            Free, open-source production management for film, TV, documentary,
+            commercial, and social video creators
         </p>
+        <div class="ai-badge">
+            <span class="ai-icon">🤖</span> AI-Enhanced Workflow
+        </div>
 
         {#if !$authState.isAuthenticated}
+            <div class="value-prop">
+                <p>
+                    Streamline your entire production process with intelligent
+                    planning, team collaboration, and resource management
+                    &mdash; all completely <strong>free</strong>.
+                </p>
+            </div>
             <div class="cta-buttons">
-                <a href="/signup" class="btn btn-primary">Get Started</a>
+                <a href="/signup" class="btn btn-primary">Get Started Free</a>
                 <a href="/login" class="btn btn-outline">Sign In</a>
-                <a href="https://github.com/seceda/slatehub" target="_blank" rel="noopener noreferrer" class="btn btn-outline secondary">View on GitHub</a>
+                <a
+                    href="https://github.com/seceda/slatehub"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="btn btn-outline secondary">View on GitHub</a
+                >
             </div>
         {:else}
             <div class="welcome-back">
-                <h2>Welcome back, {$authState.user?.username || 'User'}!</h2>
+                <h2>Welcome back, {$authState.user?.username || "User"}!</h2>
                 <div class="cta-buttons">
                     <a href="/projects" class="btn btn-primary">My Projects</a>
-                    <a href="/organizations" class="btn btn-outline">My Organizations</a>
+                    <a href="/organizations" class="btn btn-outline"
+                        >My Organizations</a
+                    >
                     <a href="/profile" class="btn btn-outline">My Profile</a>
                 </div>
             </div>
@@ -51,9 +70,12 @@
 
     <div class="features">
         <div class="feature-card">
-            <div class="feature-icon">📋</div>
-            <h3>Project Management</h3>
-            <p>Organize your productions with powerful, flexible project management tools</p>
+            <div class="feature-icon">🤖</div>
+            <h3>AI Project Planning</h3>
+            <p>
+                Intelligent scheduling, budgeting, and resource allocation
+                powered by AI
+            </p>
         </div>
         <div class="feature-card">
             <div class="feature-icon">👥</div>
@@ -61,21 +83,33 @@
             <p>Invite team members, assign roles, and collaborate seamlessly</p>
         </div>
         <div class="feature-card">
-            <div class="feature-icon">🔒</div>
-            <h3>Role-Based Access</h3>
-            <p>Control who can view, edit, or manage your production data</p>
+            <div class="feature-icon">🎬</div>
+            <h3>Production Workflow</h3>
+            <p>
+                Manage your entire project from development through
+                post-production
+            </p>
         </div>
     </div>
 
     <div class="about-section">
-        <h2>Built by Filmmakers for Filmmakers</h2>
+        <h2>Built by Filmmakers, Enhanced by AI</h2>
         <p>
-            Slatehub is developed by active filmmakers using it every day to solve real-world production challenges.
-            From pre-production planning to post-production management, Slatehub helps you stay organized 
-            and on schedule.
+            Slatehub combines industry expertise with cutting-edge AI to solve
+            real-world production challenges. From script breakdown to final
+            delivery, our platform helps you stay organized, on budget, and on
+            schedule.
         </p>
-        <p>
-            Visit <a href="https://secedastudios.com" target="_blank" rel="noopener noreferrer">Seceda Studios</a> 
+        <div class="cta-secondary">
+            <a href="/signup" class="btn btn-primary">Start Your Free Project</a
+            >
+        </div>
+        <p class="small-text">
+            Visit <a
+                href="https://secedastudios.com"
+                target="_blank"
+                rel="noopener noreferrer">Seceda Studios</a
+            >
             to learn more about our production company.
         </p>
     </div>
@@ -91,11 +125,11 @@
         margin: 1rem 2rem;
         text-align: center;
     }
-    
+
     .debug-notice a {
         font-weight: bold;
     }
-    
+
     .home {
         padding: 2rem 0;
     }
@@ -116,7 +150,28 @@
     .subtitle {
         font-size: 1.25rem;
         color: #666;
-        margin-bottom: 2rem;
+        margin-bottom: 1rem;
+    }
+
+    .ai-badge {
+        display: inline-block;
+        background-color: rgba(0, 102, 204, 0.1);
+        color: var(--primary-color);
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-weight: 600;
+        margin-bottom: 1.5rem;
+    }
+
+    .ai-icon {
+        margin-right: 0.5rem;
+    }
+
+    .value-prop {
+        max-width: 600px;
+        margin: 0 auto 1rem;
+        font-size: 1.1rem;
+        line-height: 1.6;
     }
 
     .welcome-back {
@@ -135,6 +190,10 @@
         margin: 2rem 0;
     }
 
+    .cta-secondary {
+        margin: 1.5rem 0;
+    }
+
     .features {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -148,7 +207,9 @@
         border-radius: var(--border-radius-md);
         box-shadow: var(--shadow-sm);
         text-align: center;
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        transition:
+            transform 0.3s ease,
+            box-shadow 0.3s ease;
     }
 
     .feature-card:hover {
@@ -169,12 +230,12 @@
     .feature-card p {
         color: #666;
     }
-    
+
     .secondary {
         color: #666;
         border-color: #666;
     }
-    
+
     .secondary:hover {
         background-color: #666;
         color: white;
@@ -200,6 +261,12 @@
     .about-section p {
         margin-bottom: 1rem;
         line-height: 1.7;
+    }
+
+    .small-text {
+        font-size: 0.9rem;
+        color: #666;
+        margin-top: 2rem;
     }
 
     @media (max-width: 768px) {

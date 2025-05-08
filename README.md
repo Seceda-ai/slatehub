@@ -1,6 +1,6 @@
 # Slatehub
 
-**Slatehub** is an open‑source film, TV, commercial, and social video production management tool built with a Svelte frontend and SurrealDB backend. It provides GitHub‑style collaboration with organizations, projects, and role‑based access control.
+**Slatehub** is an open‑source AI assisted film, TV, commercial, and social video production management tool built with a Svelte frontend and SurrealDB backend. It provides GitHub‑style collaboration with organizations, projects, and role‑based access control.
 
 ---
 
