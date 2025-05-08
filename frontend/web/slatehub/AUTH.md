@@ -2,6 +2,20 @@
 
 This document explains how the authentication system in Slatehub works and how to integrate it into your components.
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Authentication Flow](#authentication-flow)
+- [Integration](#integration)
+- [Auth State](#auth-state)
+- [Connection State](#connection-state)
+- [Error Handling](#error-handling)
+- [Database Queries in Authenticated Context](#database-queries-in-authenticated-context)
+- [Custom Auth Headers for Fetch](#custom-auth-headers-for-fetch)
+- [Debugging Tools](#debugging-tools)
+- [Security Considerations](#security-considerations)
+- [Troubleshooting](#troubleshooting)
+
 ## Overview
 
 Slatehub uses SurrealDB for authentication, which provides user signup, signin, and token management. The system is built to be:
@@ -110,7 +124,9 @@ enum ConnectionState {
 
 ## Error Handling
 
-The `errorMessage` store contains the most recent error message from an auth operation.
+The authentication system provides two stores for error handling:
+
+1. The `errorMessage` store contains the most recent error message from an auth operation:
 
 ```svelte
 <script>
@@ -120,6 +136,26 @@ The `errorMessage` store contains the most recent error message from an auth ope
 {#if $errorMessage}
   <div class="error-message">
     {$errorMessage}
+  </div>
+{/if}
+```
+
+2. The `errorDetails` store contains more comprehensive error information:
+
+```svelte
+<script>
+  import { errorDetails } from '$lib/db/surreal';
+</script>
+
+{#if $errorDetails.message}
+  <div class="error-message">
+    <p>{$errorDetails.message}</p>
+    {#if $errorDetails.details}
+      <p class="details">{$errorDetails.details}</p>
+    {/if}
+    {#if $errorDetails.code}
+      <p class="code">Error code: {$errorDetails.code}</p>
+    {/if}
   </div>
 {/if}
 ```
@@ -165,9 +201,60 @@ async function fetchProtectedResource() {
 - Use HTTPS in production to prevent token interception
 - Consider adding token expiration and refresh mechanism for better security
 
+## Debugging Tools
+
+Slatehub includes several tools to help debug authentication and database issues:
+
+### SurrealDebug Component
+
+The `SurrealDebug` component provides a floating debug panel in development mode:
+
+```svelte
+<script>
+  import SurrealDebug from '$lib/components/SurrealDebug.svelte';
+</script>
+
+<!-- Add this to your layout or page -->
+<SurrealDebug expanded={false} />
+```
+
+This component:
+- Shows connection status 
+- Displays current auth state
+- Shows detailed error information
+- Provides console logging shortcuts
+- Only displays in development mode
+
+### Debug Console
+
+A dedicated debug page at `/debug` provides a testing interface for:
+- Connection management
+- Authentication operations
+- Custom query execution
+- Detailed error display
+
+To use the debug console, navigate to `/debug` in your application.
+
+### Enhanced Error Logging
+
+All authentication and database operations include enhanced error logging:
+
+```javascript
+try {
+  await signin(username, password);
+} catch (error) {
+  // Error will be:
+  // 1. Logged to console with full details
+  // 2. Stored in errorMessage store
+  // 3. Detailed information stored in errorDetails store
+}
+```
+
 ## Troubleshooting
 
 1. **Auth state not persisting**: Check that localStorage is available and working
-2. **Connection errors**: Verify SurrealDB is running and accessible
+2. **Connection errors**: Verify SurrealDB is running and accessible at the specified URL
 3. **Authentication failures**: Check credentials and database access permissions
 4. **CORS issues**: Ensure SurrealDB is configured to allow requests from your frontend
+5. **Detailed error investigation**: Use the `/debug` page to view complete error information
+6. **Database query issues**: Check permission rules in your SurrealDB schema

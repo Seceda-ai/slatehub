@@ -9,6 +9,7 @@ This is the Svelte-based frontend for Slatehub, an open-source production manage
 - **Profile Management**: User profile information display
 - **Responsive Design**: Works on desktop and mobile devices
 - **Role-Based Access Control**: Different views and permissions for different user roles
+- **Debugging Tools**: Comprehensive error handling and debugging utilities
 
 ## Prerequisites
 
@@ -108,6 +109,43 @@ Global CSS variables are defined in `src/app.css`. You can modify these to chang
   <!-- Your page content here -->
 </AuthGuard>
 ```
+
+## Debugging
+
+Slatehub includes comprehensive debugging tools to help you troubleshoot SurrealDB authentication and query issues:
+
+### 1. Enhanced Error Display
+
+The login and signup forms now display detailed error information, including:
+- Error message
+- Error code
+- Detailed description of the problem
+- Raw error data when available
+
+### 2. SurrealDebug Component
+
+In development mode, a floating debug panel is available at the bottom right of the screen:
+- Shows current connection status
+- Displays authentication state
+- Provides detailed error information
+- Can be expanded/collapsed as needed
+
+### 3. Debug Console
+
+A dedicated debug route at `/debug` provides a comprehensive testing interface:
+- Test database connections
+- Try authentication operations (signup, signin, signout)
+- Execute custom SurrealQL queries
+- View detailed error information
+- Monitor operation timing
+
+### 4. Console Logging
+
+Enhanced error logging in the browser console provides additional context for troubleshooting:
+- Connection errors
+- Authentication errors
+- Query errors
+- Raw error data for detailed inspection
 
 ## Contributing
 

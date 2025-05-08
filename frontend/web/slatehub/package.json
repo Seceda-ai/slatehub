@@ -21,6 +21,6 @@
 		"vite": "^6.2.6"
 	},
 	"dependencies": {
-		"surrealdb.js": "^1.0.0"
+		"surrealdb": "^1.0.0"
 	}
 }

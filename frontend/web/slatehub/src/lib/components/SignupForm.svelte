@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { connect, signup, errorMessage, connectionState, ConnectionState } from '$lib/db/surreal';
+  import { connect, signup, errorDetails, errorMessage, connectionState, ConnectionState, isAuthenticated, getConnectionState } from '$lib/db/surreal';
   import '$lib/styles/forms.css';
   
   // Form data
@@ -22,8 +22,7 @@
   
   // Connect to SurrealDB when component mounts
   onMount(async () => {
-    const dbUrl = import.meta.env.VITE_SURREAL_URL || 'http://localhost:8000';
-    await connect(dbUrl);
+    await connect();
   });
   
   // Validate form
@@ -74,9 +73,8 @@
       isSubmitting = true;
       
       // Check if connected
-      if ($connectionState !== ConnectionState.CONNECTED) {
-        const dbUrl = import.meta.env.VITE_SURREAL_URL || 'http://localhost:8000';
-        await connect(dbUrl);
+      if (getConnectionState() !== ConnectionState.CONNECTED) {
+        await connect();
       }
       
       // Attempt signup
@@ -110,7 +108,15 @@
   
   {#if formError}
     <div class="form-message error">
-      {formError}
+      <p class="error-title">{formError}</p>
+      {#if $errorDetails.details}
+        <div class="error-details">
+          <p>{$errorDetails.details}</p>
+          {#if $errorDetails.code}
+            <p class="error-code">Error code: {$errorDetails.code}</p>
+          {/if}
+        </div>
+      {/if}
     </div>
   {/if}
   

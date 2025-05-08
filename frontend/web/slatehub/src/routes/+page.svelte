@@ -4,15 +4,27 @@
     import { goto } from '$app/navigation';
 
     let welcomeMessage = "Welcome to Slatehub";
+    let showDebugInfo = false;
     
     onMount(async () => {
         // Try to connect to the database on page load
         const dbUrl = import.meta.env.VITE_SURREAL_URL || 'http://localhost:8000';
         await connect(dbUrl);
+        
+        // Only show debug info in development mode
+        showDebugInfo = import.meta.env.DEV || import.meta.env.MODE === 'development';
     });
 </script>
 
 <div class="home">
+    {#if showDebugInfo}
+        <div class="debug-notice">
+            <p>
+                <strong>Developer Mode:</strong> Having authentication issues? Visit the 
+                <a href="/debug">Debug Console</a> to troubleshoot SurrealDB connections.
+            </p>
+        </div>
+    {/if}
     <div class="hero">
         <h1>{welcomeMessage}</h1>
         <p class="subtitle">
@@ -70,6 +82,20 @@
 </div>
 
 <style>
+    .debug-notice {
+        background-color: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-left: 4px solid #0066cc;
+        border-radius: 4px;
+        padding: 1rem;
+        margin: 1rem 2rem;
+        text-align: center;
+    }
+    
+    .debug-notice a {
+        font-weight: bold;
+    }
+    
     .home {
         padding: 2rem 0;
     }

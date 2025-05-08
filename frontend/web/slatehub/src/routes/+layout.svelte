@@ -1,13 +1,23 @@
 <script>
-    import { onMount } from 'svelte';
-    import { connect, authState } from '$lib/db/surreal';
+    import { onMount, onDestroy } from 'svelte';
+    import { connect, closeConnection, authState } from '$lib/db/surreal';
     import Navbar from '$lib/components/Navbar.svelte';
+    import SurrealDebug from '$lib/components/SurrealDebug.svelte';
     import '../app.css';
     
     // Connect to SurrealDB when layout mounts
     onMount(async () => {
-        const dbUrl = import.meta.env.VITE_SURREAL_URL || 'http://localhost:8000';
-        await connect(dbUrl);
+        try {
+            await connect();
+            console.log('SurrealDB connection established in layout');
+        } catch (error) {
+            console.error('Failed to connect to SurrealDB:', error);
+        }
+    });
+    
+    // Close connection when unmounting
+    onDestroy(() => {
+        closeConnection();
     });
 </script>
 
@@ -23,6 +33,8 @@
             <slot />
         </div>
     </main>
+    
+    <SurrealDebug />
     
     <footer class="footer">
         <div class="container">

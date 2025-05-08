@@ -92,6 +92,26 @@
   background-color: rgba(201, 32, 32, 0.1);
   color: var(--error-color);
   border: 1px solid rgba(201, 32, 32, 0.2);
+  padding: 1rem;
+}
+
+.error-title {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.error-details {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  border-top: 1px solid rgba(201, 32, 32, 0.2);
+  padding-top: 0.5rem;
+}
+
+.error-code {
+  font-family: monospace;
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  opacity: 0.8;
 }
 
 .form-message.success {
