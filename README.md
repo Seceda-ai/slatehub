@@ -35,8 +35,8 @@ slatehub/
 │       ├── seed_admin_org.surql # SQL script to seed organization and membership
 │       └── schema.surql         # SurrealDB schema definitions
 ├── frontend/
-│   └── web/                     # Svelte application root
-├── .env.example                 # Environment variable template
+│   └── web/                     # Svelte application slatehub
+├── .env-example                 # Environment variable template
 ├── docker-compose.yml           # SurrealDB service definition
 ├── Makefile                     # Development and seeding commands
 └── README.md                    # This file
@@ -56,7 +56,7 @@ slatehub/
 2. **Create your environment file**
 
    ```bash
-   cp .env.example .env
+   cp .env-example .env
    # Then edit .env and fill in values:
    # SURREAL_USER, SURREAL_PASS, SURREAL_NS, SURREAL_DB
    # ADMIN_USERNAME, ADMIN_PASSWORD, ADMIN_EMAIL, ADMIN_ORG_NAME
@@ -68,7 +68,7 @@ slatehub/
    * **Frontend**:
 
      ```bash
-     cd frontend/web
+     cd frontend/web/slatehub
      npm install
      cd -
      ```
