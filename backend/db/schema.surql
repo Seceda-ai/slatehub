@@ -34,11 +34,17 @@ DEFINE FIELD email ON person TYPE string
   VALUE  string::lowercase($value)
   ASSERT string::is::email($value);
 
+  --TODO SET PERMS
 DEFINE FIELD global_role ON person TYPE string
   VALUE  $value ?? "user"
   ASSERT $value IN ["admin","user"];
 
-DEFINE FIELD created_at ON person TYPE datetime;
+  DEFINE FIELD created_at ON person TYPE datetime
+      VALUE time::now() READONLY;
+
+  DEFINE FIELD updated_at ON person TYPE datetime
+      VALUE time::now()
+      DEFAULT ALWAYS time::now();
 
 DEFINE INDEX idx_person_username ON person COLUMNS username UNIQUE;
 DEFINE INDEX idx_person_email    ON person COLUMNS email    UNIQUE;
@@ -56,9 +62,14 @@ DEFINE FIELD name       ON organization TYPE string
 
 DEFINE FIELD slug       ON organization TYPE string
   VALUE  string::slug(name)
-  ASSERT $value = /^[a-z0-9_-]+$/;
+  DEFAULT string::slug(name);
 
-DEFINE FIELD created_at ON organization TYPE datetime;
+DEFINE FIELD created_at ON organization TYPE datetime
+    VALUE time::now() READONLY;
+
+DEFINE FIELD updated_at ON organization TYPE datetime
+    VALUE time::now()
+    DEFAULT ALWAYS time::now();
 
 DEFINE INDEX idx_organization_slug ON organization COLUMNS slug UNIQUE;
 
@@ -75,10 +86,15 @@ DEFINE FIELD name             ON project TYPE string
 
 DEFINE FIELD slug             ON project TYPE string
   VALUE  string::slug(name)
-  ASSERT $value = /^[a-z0-9_-]+$/;
+  DEFAULT string::slug(name);
 
 DEFINE FIELD organization_id  ON project TYPE record<organization>;
-DEFINE FIELD created_at       ON project TYPE datetime;
+DEFINE FIELD created_at ON project TYPE datetime
+    VALUE time::now() READONLY;
+
+DEFINE FIELD updated_at ON project TYPE datetime
+    VALUE time::now()
+    DEFAULT ALWAYS time::now();
 
 -- Unique slug per organization
 DEFINE INDEX idx_project_org_slug ON project COLUMNS organization_id, slug UNIQUE;

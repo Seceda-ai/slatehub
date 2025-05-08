@@ -28,7 +28,13 @@
 
 {#if showDebug}
   <div class="surreal-debug {expanded ? 'expanded' : 'collapsed'}">
-    <div class="debug-header" on:click={toggleExpanded}>
+    <div class="debug-header" 
+      on:click={toggleExpanded}
+      on:keydown={(e) => e.key === 'Enter' && toggleExpanded()}
+      tabindex="0"
+      role="button"
+      aria-expanded={expanded}
+      aria-controls="debug-content">
       <span class="debug-title">SurrealDB Debug</span>
       <span class="connection-status" class:connected={$connectionState === ConnectionState.CONNECTED} 
         class:error={$connectionState === ConnectionState.ERROR}
@@ -40,7 +46,7 @@
     </div>
     
     {#if expanded}
-      <div class="debug-content">
+      <div id="debug-content" class="debug-content">
         <div class="debug-section">
           <h3>Auth State</h3>
           <div class="debug-value">

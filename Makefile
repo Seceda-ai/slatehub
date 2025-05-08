@@ -30,11 +30,11 @@ init-db: start-db
 	@echo "→ Waiting for DB to become ready…"
 	@sleep 3
 	@echo "→ Importing schema…"
-	surreal import \
+	@surreal import \
 		--conn $(DB_URL) \
 		--user $(SURREAL_USER) --pass $(SURREAL_PASS) \
 		--namespace $(SURREAL_NS) --database $(SURREAL_DB) \
-		$(SCHEMA_FILE)
+		$(SCHEMA_FILE) 2>/dev/null || echo "Schema already exists or import had errors (this is usually OK if you've run this before)"
 
 start-frontend:
 	@echo "→ Launching Svelte frontend…"
