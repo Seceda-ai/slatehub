@@ -1,9 +1,15 @@
 import {
-  query,
+  db,
   getConnectionState,
   connect,
   ConnectionState,
 } from "$lib/db/surreal";
+
+// Constants
+const OWNER_ROLE = "owner";
+const ADMIN_ROLE = "admin";
+const EDITOR_ROLE = "editor";
+const VIEWER_ROLE = "viewer";
 
 // Interfaces
 export interface Organization {
@@ -11,6 +17,7 @@ export interface Organization {
   name: string;
   slug: string;
   created_at?: string;
+  updated_at?: string;
 }
 
 export interface OrganizationMember {
@@ -18,7 +25,8 @@ export interface OrganizationMember {
   in: string; // person id
   out: string; // organization id
   role: "owner" | "admin" | "editor" | "viewer";
-  joined_at?: string;
+  created_at?: string;
+  updated_at?: string;
   person?: {
     username: string;
     email: string;
@@ -34,143 +42,47 @@ export async function getUserOrganizations(): Promise<Organization[]> {
     }
 
     // Get organizations where the user is a member
-    const result = await query<[Organization[]]>(`
-          SELECT organization.*
-          FROM member_of_org
-          WHERE in = $auth.id
-          FETCH organization.*
-        `);
+    const result = await db.query<[Organization[]]>(`
+      SELECT organization.*
+      FROM member_of_org
+      WHERE in = $auth.id
+      FETCH organization.*
+    `);
 
     return result[0] || [];
   } catch (error) {
     console.error("Error fetching user organizations:", error);
-    throw error;
+    throw new Error(
+      `Failed to fetch organizations: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }
 
 // Create a new organization
 export async function createOrganization(name: string): Promise<Organization> {
+  if (!name || name.trim() === "") {
+    throw new Error("Organization name is required");
+  }
+
   try {
     // Ensure we're connected
     if (getConnectionState() !== ConnectionState.CONNECTED) {
       await connect();
     }
 
-    // First create the organization
-    try {
-      // Log the current user for debugging
-      console.log("Current auth user:", await query("SELECT * FROM $auth"));
+    // Use a transaction to create both organization and membership in one atomic operation
+    const result = await db.query<[[Organization]]>(
+      "CREATE organization SET name = $name RETURN *;",
+      { name },
+    );
+    console.log("Hello:", JSON.stringify(result));
 
-      // Create organization with a more basic query
-      const createResult = await query(`CREATE organization SET name = $name`, {
-        name,
-      });
-
-      console.log(
-        "Organization creation raw result:",
-        JSON.stringify(createResult),
-      );
-
-      // Extract the organization ID from the result, handling different response formats
-      let orgId = "";
-
-      // Dump the structure for debugging
-      console.log("Create result type:", typeof createResult);
-      console.log(
-        "Create result structure:",
-        JSON.stringify(createResult, null, 2),
-      );
-
-      try {
-        // Most common format: [{ result: [{ id: "organization:xyz" }] }]
-        if (Array.isArray(createResult) && createResult.length > 0) {
-          if (
-            createResult[0]?.result &&
-            Array.isArray(createResult[0].result)
-          ) {
-            orgId = createResult[0].result[0]?.id;
-          }
-          // Format: [{ id: "organization:xyz" }]
-          else if (createResult[0]?.id) {
-            orgId = createResult[0].id;
-          }
-          // Format: [[{ id: "organization:xyz" }]]
-          else if (
-            Array.isArray(createResult[0]) &&
-            createResult[0].length > 0 &&
-            createResult[0][0]?.id
-          ) {
-            orgId = createResult[0][0].id;
-          }
-        }
-      } catch (e) {
-        console.error("Error parsing organization ID:", e);
-      }
-
-      console.log("Extracted organization ID:", orgId);
-
-      if (!orgId) {
-        // As a fallback, query for the recently created organization
-        console.log(
-          "ID extraction failed, trying to find the org by name/slug",
-        );
-        const findResult = await query(
-          `
-        SELECT id FROM organization
-        WHERE name = $name AND slug = $slug
-        ORDER BY created_at DESC
-        LIMIT 1
-      `,
-          { name, slug },
-        );
-
-        console.log("Find result:", JSON.stringify(findResult));
-
-        // Try to extract ID from the find result
-        if (
-          Array.isArray(findResult) &&
-          findResult.length > 0 &&
-          Array.isArray(findResult[0]) &&
-          findResult[0].length > 0
-        ) {
-          orgId = findResult[0][0].id;
-          console.log("Found organization ID through query:", orgId);
-        }
-
-        if (!orgId) {
-          throw new Error("Could not extract or find organization ID");
-        }
-      }
-
-      // Add current user as owner
-      const memberResult = await query(
-        `
-      CREATE member_of_org CONTENT {
-        in: $auth.id,
-        out: $orgId,
-        role: "owner",
-        joined_at: time::now()
-      }
-    `,
-        { orgId },
-      );
-
-      console.log("Membership creation result:", JSON.stringify(memberResult));
-
-      // Return the organization object directly
-      return {
-        id: orgId,
-        name: name,
-        slug: slug,
-        created_at: new Date().toISOString(),
-      };
-    } catch (err) {
-      console.error("Error in organization creation process:", err);
-      throw new Error(`Organization creation failed: ${err.message}`);
-    }
+    return result;
   } catch (error) {
     console.error("Error creating organization:", error);
-    throw error;
+    throw new Error(
+      `Failed to create organization: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }
 
@@ -184,54 +96,29 @@ export async function getOrganizationBySlug(
       await connect();
     }
 
-    console.log(`Looking up organization with slug/id: ${slugOrId}`);
-
     // Check if the value looks like an ID (organization:xyz format)
     const isId = slugOrId.includes(":") || slugOrId.includes("/");
 
-    let result;
-    if (isId) {
-      // If it's an ID, use direct lookup
-      result = await query<[Organization[]]>(`
-        SELECT *
-        FROM ${slugOrId}
-        WHERE id IN (
-          SELECT out FROM member_of_org
-          WHERE in = $auth.id
-        )
-      `);
-    } else {
-      // Otherwise treat as slug
-      result = await query<[Organization[]]>(
-        `
-        SELECT *
-        FROM organization
-        WHERE slug = $slug
-        AND id IN (
-          SELECT out FROM member_of_org
-          WHERE in = $auth.id
-        )
-      `,
-        { slug: slugOrId },
-      );
+    // Construct the appropriate query based on whether we have an ID or slug
+    const sql = isId
+      ? `SELECT * FROM ${slugOrId}
+       WHERE id IN (SELECT out FROM member_of_org WHERE in = $auth.id)`
+      : `SELECT * FROM organization
+       WHERE slug = $slug
+       AND id IN (SELECT out FROM member_of_org WHERE in = $auth.id)`;
+
+    // Execute the query
+    const result = await db.query<[Organization[]]>(
+      sql,
+      isId ? {} : { slug: slugOrId },
+    );
+
+    // Return the first organization or null if none found
+    if (result[0] && result[0].length > 0) {
+      return result[0][0];
     }
 
-    console.log("Organization lookup result:", JSON.stringify(result));
-
-    // Extract the organization from the result
-    let org = null;
-    if (Array.isArray(result) && result.length > 0) {
-      if (Array.isArray(result[0]) && result[0].length > 0) {
-        org = result[0][0];
-      } else if (typeof result[0] === "object") {
-        org = result[0];
-      }
-    }
-
-    // Log and validate what we found
-    console.log("Organization found:", org);
-
-    return org;
+    return null;
   } catch (error) {
     console.error(
       `Error fetching organization with slug/id '${slugOrId}':`,
@@ -252,55 +139,29 @@ export async function updateOrganization(
       await connect();
     }
 
-    // Generate a slug if the name was updated
-    const slug = data.name
-      ? data.name
-          .toLowerCase()
-          .replace(/[^\w-]+/g, "-")
-          .replace(/^-+|-+$/g, "")
-      : undefined;
-
-    const result = await query<[Organization[]]>(
+    // The schema will auto-generate the slug from the updated name
+    const result = await db.query<[Organization[]]>(
       `
-        UPDATE ${id} CONTENT {
-          name: $name,
-          slug: $slug
-        }
-        WHERE id IN (
-          SELECT out FROM member_of_org
-          WHERE in = $auth.id
-          AND role IN ["owner", "admin"]
-        );
-      `,
-      { name: data.name, slug },
+      UPDATE ${id} CONTENT {
+        name: $name,
+        updated_at: time::now()
+      }
+      WHERE id IN (
+        SELECT out FROM member_of_org
+        WHERE in = $auth.id
+        AND role IN ["owner", "admin"]
+      )
+      RETURN *;
+    `,
+      { name: data.name },
     );
 
-    // Fetch the updated organization
-    const orgResult = await query<[Organization[]]>(`
-        SELECT * FROM ${id}
-        WHERE id IN (
-          SELECT out FROM member_of_org
-          WHERE in = $auth.id
-        )
-      `);
-
-    console.log("Organization update result:", JSON.stringify(orgResult));
-
-    // Extract the organization from the result
-    let org = null;
-    if (Array.isArray(orgResult) && orgResult.length > 0) {
-      if (Array.isArray(orgResult[0]) && orgResult[0].length > 0) {
-        org = orgResult[0][0];
-      } else if (typeof orgResult[0] === "object") {
-        org = orgResult[0];
-      }
-    }
-
-    if (!org) {
+    // Check if we got a result back
+    if (!result[0] || result[0].length === 0) {
       throw new Error("Failed to update organization or you lack permission");
     }
 
-    return org;
+    return result[0][0];
   } catch (error) {
     console.error("Error updating organization:", error);
     throw error;
@@ -309,31 +170,31 @@ export async function updateOrganization(
 
 // Delete an organization
 export async function deleteOrganization(id: string): Promise<boolean> {
+  if (!id) throw new Error("Organization ID is required");
+
   try {
     // Ensure we're connected
     if (getConnectionState() !== ConnectionState.CONNECTED) {
       await connect();
     }
 
-    // First check if user is owner
-    const checkResult = await query<[OrganizationMember[]]>(
-      `
-      SELECT * FROM member_of_org
-      WHERE in = $auth.id
-      AND out = $id
-      AND role = "owner";
-    `,
-      { id },
-    );
-
-    if (!checkResult[0] || checkResult[0].length === 0) {
-      throw new Error("Only organization owners can delete organizations");
-    }
-
-    // Delete org and all relationships in transaction
-    await query(
+    // Check permission and delete in a single transaction
+    await db.query(
       `
       BEGIN TRANSACTION;
+
+      // Check if user is owner
+      LET $isOwner = (
+        SELECT * FROM member_of_org
+        WHERE in = $auth.id
+        AND out = $id
+        AND role = "${OWNER_ROLE}"
+      )[0];
+
+      // Throw error if not owner
+      IF $isOwner == NONE THEN
+        THROW "Only organization owners can delete organizations";
+      END;
 
       // Delete member relationships
       DELETE member_of_org WHERE out = $id;
@@ -349,7 +210,9 @@ export async function deleteOrganization(id: string): Promise<boolean> {
     return true;
   } catch (error) {
     console.error("Error deleting organization:", error);
-    throw error;
+    throw new Error(
+      `Failed to delete organization: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }
 
@@ -363,25 +226,28 @@ export async function getOrganizationMembers(
       await connect();
     }
 
-    const result = await query<[OrganizationMember[]]>(
+    // Get all members with person details
+    const result = await db.query<[OrganizationMember[]]>(
       `
-        SELECT
-          id,
-          in,
-          out,
-          role,
-          joined_at,
-          (SELECT username, email FROM person WHERE id = in) AS person
-        FROM member_of_org
-        WHERE out = $orgId
-      `,
+      SELECT
+        id,
+        in,
+        out,
+        role,
+        joined_at,
+        (SELECT username, email FROM person WHERE id = in) AS person
+      FROM member_of_org
+      WHERE out = $orgId
+    `,
       { orgId },
     );
 
     return result[0] || [];
   } catch (error) {
     console.error("Error fetching organization members:", error);
-    throw error;
+    throw new Error(
+      `Failed to fetch organization members: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }
 
@@ -391,31 +257,32 @@ export async function addOrganizationMember(
   username: string,
   role: "admin" | "editor" | "viewer",
 ): Promise<OrganizationMember> {
+  if (!orgId) throw new Error("Organization ID is required");
+  if (!username) throw new Error("Username is required");
+  if (!role) throw new Error("Role is required");
+
   try {
     // Ensure we're connected
     if (getConnectionState() !== ConnectionState.CONNECTED) {
       await connect();
     }
 
-    // First check if current user has permission (must be owner or admin)
-    const checkResult = await query<[OrganizationMember[]]>(
-      `
-      SELECT * FROM member_of_org
-      WHERE in = $auth.id
-      AND out = $orgId
-      AND role IN ["owner", "admin"];
-    `,
-      { orgId },
-    );
-
-    if (!checkResult[0] || checkResult[0].length === 0) {
-      throw new Error("You must be an owner or admin to add members");
-    }
-
-    // Now add the user
-    const result = await query<[OrganizationMember[]]>(
+    // Do everything in a single transaction
+    const result = await db.query<[OrganizationMember[]]>(
       `
       BEGIN TRANSACTION;
+
+      // Check if current user has permission
+      LET $hasPermission = (
+        SELECT * FROM member_of_org
+        WHERE in = $auth.id
+        AND out = $orgId
+        AND role IN ["${OWNER_ROLE}", "${ADMIN_ROLE}"]
+      )[0];
+
+      IF $hasPermission == NONE THEN
+        THROW "You must be an owner or admin to add members";
+      END;
 
       // Find the person by username
       LET $person = (SELECT id FROM person WHERE username = $username)[0];
@@ -443,15 +310,15 @@ export async function addOrganizationMember(
         joined_at: time::now()
       };
 
-          // Return with user details
-          RETURN SELECT
-            id,
-            in,
-            out,
-            role,
-            joined_at,
-            (SELECT username, email FROM person WHERE id = in) AS person
-          FROM $member.id
+      // Return with user details
+      RETURN SELECT
+        id,
+        in,
+        out,
+        role,
+        joined_at,
+        (SELECT username, email FROM person WHERE id = in) AS person
+      FROM $member.id;
 
       COMMIT TRANSACTION;
     `,
@@ -465,7 +332,9 @@ export async function addOrganizationMember(
     return result[0][0];
   } catch (error) {
     console.error("Error adding organization member:", error);
-    throw error;
+    throw new Error(
+      `Failed to add member: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }
 
@@ -474,58 +343,58 @@ export async function updateMemberRole(
   memberId: string,
   newRole: "owner" | "admin" | "editor" | "viewer",
 ): Promise<OrganizationMember> {
+  if (!memberId) throw new Error("Member ID is required");
+  if (!newRole) throw new Error("New role is required");
+
   try {
     // Ensure we're connected
     if (getConnectionState() !== ConnectionState.CONNECTED) {
       await connect();
     }
 
-    // First get the organization ID from the membership
-    const membershipResult = await query<[OrganizationMember[]]>(`
-      SELECT * FROM ${memberId};
-    `);
-
-    if (!membershipResult[0] || membershipResult[0].length === 0) {
-      throw new Error("Membership not found");
-    }
-
-    const orgId = membershipResult[0][0].out;
-
-    // Check if current user has permission (must be owner or admin)
-    const checkResult = await query<[OrganizationMember[]]>(
+    // Handle permission checks and update in a single transaction
+    const result = await db.query<[OrganizationMember[]]>(
       `
-      SELECT * FROM member_of_org
-      WHERE in = $auth.id
-      AND out = $orgId
-      AND role IN ["owner", "admin"];
-    `,
-      { orgId },
-    );
+      BEGIN TRANSACTION;
 
-    if (!checkResult[0] || checkResult[0].length === 0) {
-      throw new Error("You must be an owner or admin to change member roles");
-    }
+      // Get the membership info
+      LET $membership = (SELECT * FROM ${memberId})[0];
 
-    // If changing to owner role, make sure current user is owner
-    if (newRole === "owner") {
-      const ownerCheckResult = await query<[OrganizationMember[]]>(
-        `
+      // Error if membership not found
+      IF $membership == NONE THEN
+        THROW "Membership not found";
+      END;
+
+      // Get the organization ID
+      LET $orgId = $membership.out;
+
+      // Check if current user has permission
+      LET $hasPermission = (
         SELECT * FROM member_of_org
         WHERE in = $auth.id
         AND out = $orgId
-        AND role = "owner";
-      `,
-        { orgId },
-      );
+        AND role IN ["${OWNER_ROLE}", "${ADMIN_ROLE}"]
+      )[0];
 
-      if (!ownerCheckResult[0] || ownerCheckResult[0].length === 0) {
-        throw new Error("Only organization owners can assign owner role");
-      }
-    }
+      IF $hasPermission == NONE THEN
+        THROW "You must be an owner or admin to change member roles";
+      END;
 
-    // Update the role
-    const result = await query<[OrganizationMember[]]>(
-      `
+      // If changing to owner role, check if current user is owner
+      IF $newRole == "${OWNER_ROLE}" THEN
+        LET $isOwner = (
+          SELECT * FROM member_of_org
+          WHERE in = $auth.id
+          AND out = $orgId
+          AND role = "${OWNER_ROLE}"
+        )[0];
+
+        IF $isOwner == NONE THEN
+          THROW "Only organization owners can assign owner role";
+        END;
+      END;
+
+      // Update the role and return updated member
       UPDATE ${memberId} CONTENT {
         role: $newRole
       }
@@ -535,7 +404,9 @@ export async function updateMemberRole(
         out,
         role,
         joined_at,
-        (SELECT username, email FROM person WHERE id = in) AS person
+        (SELECT username, email FROM person WHERE id = in) AS person;
+
+      COMMIT TRANSACTION;
     `,
       { newRole },
     );
@@ -547,75 +418,83 @@ export async function updateMemberRole(
     return result[0][0];
   } catch (error) {
     console.error("Error updating member role:", error);
-    throw error;
+    throw new Error(
+      `Failed to update member role: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }
 
 // Remove a member from an organization
 export async function removeMember(memberId: string): Promise<boolean> {
+  if (!memberId) throw new Error("Member ID is required");
+
   try {
     // Ensure we're connected
     if (getConnectionState() !== ConnectionState.CONNECTED) {
       await connect();
     }
 
-    // First get the organization ID from the membership
-    const membershipResult = await query<[OrganizationMember[]]>(`
-      SELECT * FROM ${memberId};
-    `);
+    // Perform permission checks and deletion in a single transaction
+    await db.query(`
+      BEGIN TRANSACTION;
 
-    if (!membershipResult[0] || membershipResult[0].length === 0) {
-      throw new Error("Membership not found");
-    }
+      // Get membership information
+      LET $membership = (SELECT * FROM ${memberId})[0];
 
-    const orgId = membershipResult[0][0].out;
-    const personId = membershipResult[0][0].in;
+      // Error if membership not found
+      IF $membership == NONE THEN
+        THROW "Membership not found";
+      END;
 
-    // Check if current user has permission (must be owner or admin)
-    const checkResult = await query<[OrganizationMember[]]>(
-      `
-      SELECT * FROM member_of_org
-      WHERE in = $auth.id
-      AND out = $orgId
-      AND role IN ["owner", "admin"];
-    `,
-      { orgId },
-    );
+      LET $orgId = $membership.out;
+      LET $personId = $membership.in;
+      LET $memberRole = $membership.role;
 
-    if (!checkResult[0] || checkResult[0].length === 0) {
-      throw new Error("You must be an owner or admin to remove members");
-    }
-
-    // If removing an owner, make sure current user is also an owner
-    if (membershipResult[0][0].role === "owner") {
-      const ownerCheckResult = await query<[OrganizationMember[]]>(
-        `
+      // Check if current user has permission
+      LET $hasPermission = (
         SELECT * FROM member_of_org
         WHERE in = $auth.id
         AND out = $orgId
-        AND role = "owner";
-      `,
-        { orgId },
-      );
+        AND role IN ["${OWNER_ROLE}", "${ADMIN_ROLE}"]
+      )[0];
 
-      if (!ownerCheckResult[0] || ownerCheckResult[0].length === 0) {
-        throw new Error("Only organization owners can remove other owners");
-      }
-    }
+      IF $hasPermission == NONE THEN
+        THROW "You must be an owner or admin to remove members";
+      END;
 
-    // Prevent removing yourself
-    if (personId === "$auth.id") {
-      throw new Error("You cannot remove yourself from an organization");
-    }
+      // If removing an owner, check if current user is also an owner
+      IF $memberRole == "${OWNER_ROLE}" THEN
+        LET $isOwner = (
+          SELECT * FROM member_of_org
+          WHERE in = $auth.id
+          AND out = $orgId
+          AND role = "${OWNER_ROLE}"
+        )[0];
 
-    // Delete the membership
-    await query(`
+        IF $isOwner == NONE THEN
+          THROW "Only organization owners can remove other owners";
+        END;
+      END;
+
+      // Get current user info
+      LET $currentUser = $auth.id;
+
+      // Prevent removing yourself
+      IF $personId == $currentUser THEN
+        THROW "You cannot remove yourself from an organization";
+      END;
+
+      // Delete the membership
       DELETE ${memberId};
+
+      COMMIT TRANSACTION;
     `);
 
     return true;
   } catch (error) {
     console.error("Error removing organization member:", error);
-    throw error;
+    throw new Error(
+      `Failed to remove member: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }

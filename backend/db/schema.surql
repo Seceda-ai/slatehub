@@ -51,11 +51,11 @@ DEFINE INDEX idx_person_email    ON person COLUMNS email    UNIQUE;
 
 -- ORGANIZATION TABLE
 DEFINE TABLE organization SCHEMAFULL
-  PERMISSIONS
-    FOR select, update, delete WHERE
-      $auth.global_role = "admin"
-      OR $auth.id IN (SELECT in FROM member_of_org WHERE out = $auth.id),
-    FOR create WHERE $auth.id != NONE;
+   PERMISSIONS
+  --   FOR select, update, delete WHERE
+  --     $auth.global_role = "admin"
+  --     OR $auth.id IN (SELECT in FROM member_of_org WHERE out = $auth.id),
+     -- FOR select, create WHERE $auth != NONE;
 
 DEFINE FIELD name       ON organization TYPE string
   ASSERT $value != "";
@@ -106,7 +106,12 @@ DEFINE TABLE member_of_org SCHEMAFULL
 DEFINE FIELD role      ON member_of_org TYPE string
   ASSERT $value IN ["owner","admin","editor","viewer"];
 
-DEFINE FIELD joined_at ON member_of_org TYPE datetime;
+  DEFINE FIELD created_at ON member_of_org TYPE datetime
+      VALUE time::now() READONLY;
+
+  DEFINE FIELD updated_at ON member_of_org TYPE datetime
+      VALUE time::now()
+      DEFAULT ALWAYS time::now();
 
 -- PROJECT MEMBERSHIP EDGE
 DEFINE TABLE member_of_project SCHEMAFULL
@@ -115,7 +120,12 @@ DEFINE TABLE member_of_project SCHEMAFULL
 DEFINE FIELD role      ON member_of_project TYPE string
   ASSERT $value IN ["owner","admin","editor","viewer"];
 
-DEFINE FIELD joined_at ON member_of_project TYPE datetime;
+  DEFINE FIELD created_at ON member_of_project TYPE datetime
+      VALUE time::now() READONLY;
+
+  DEFINE FIELD updated_at ON member_of_project TYPE datetime
+      VALUE time::now()
+      DEFAULT ALWAYS time::now();
 
 -- INVITATION EDGE
 DEFINE TABLE invited SCHEMAFULL
