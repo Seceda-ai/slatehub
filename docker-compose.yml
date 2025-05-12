@@ -1,7 +1,7 @@
 services:
   db:
     # Official SurrealDB image with latest version
-    image: surrealdb/surrealdb:latest
+    image: surrealdb/surrealdb:v2.2.2
     container_name: surreal
     environment:
       - SURREAL_USER=${SURREAL_USER}

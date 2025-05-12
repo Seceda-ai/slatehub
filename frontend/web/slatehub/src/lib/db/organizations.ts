@@ -43,13 +43,13 @@ export async function getUserOrganizations(): Promise<Organization[]> {
 
     // Get organizations where the user is a member
     const result = await db.query<[Organization[]]>(`
-      SELECT organization.*
-      FROM member_of_org
-      WHERE in = $auth.id
-      FETCH organization.*
+      SELECT VALUE array::flatten(->membership->(organization))
+      FROM $auth.id
+      FETCH organization;
     `);
 
-    return result[0] || [];
+    console.log("Get Orgs: \n", JSON.stringify(result, null, 2));
+    return result[0][0];
   } catch (error) {
     console.error("Error fetching user organizations:", error);
     throw new Error(
@@ -83,11 +83,7 @@ export async function createOrganization(name: string): Promise<Organization> {
       };
 
       // Create the membership edge with owner role
-      LET $membership = CREATE member_of_org CONTENT {
-        in: $auth.id,
-        out: $org.id,
-        role: "${OWNER_ROLE}"
-      };
+      LET $membership = RELATE $auth->membership->$org SET role = 'owner';
 
       // Return the organization
       RETURN {
@@ -100,6 +96,7 @@ export async function createOrganization(name: string): Promise<Organization> {
       { name },
     );
 
+    console.log("Org Create: ", result);
     // Extract the organization from the result
     if (!result[0]?.organization) {
       throw new Error("Failed to create organization");

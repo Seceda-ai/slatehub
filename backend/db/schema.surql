@@ -49,12 +49,10 @@ DEFINE INDEX idx_person_username ON person COLUMNS username UNIQUE;
 DEFINE INDEX idx_person_email    ON person COLUMNS email    UNIQUE;
 
 -- ORGANIZATION TABLE
+-- add persmissions
 DEFINE TABLE organization SCHEMAFULL
    PERMISSIONS
-    FOR select, update, delete WHERE
-      $auth.global_role = "admin"
-      OR $auth.id IN (SELECT in FROM member_of_org WHERE out = $auth.id),
-     FOR select, create WHERE $auth != NONE;
+     FOR select, create WHERE $auth is not none;
 
 DEFINE FIELD name       ON organization TYPE string
   ASSERT $value != "";
@@ -87,44 +85,23 @@ DEFINE FIELD slug             ON project TYPE string
   VALUE  string::slug(name)
   DEFAULT string::slug(name);
 
-DEFINE FIELD organization_id  ON project TYPE record<organization>;
-DEFINE FIELD created_at ON project TYPE datetime
-    VALUE time::now() READONLY;
-
 DEFINE FIELD updated_at ON project TYPE datetime
     VALUE time::now()
     DEFAULT ALWAYS time::now();
 
 -- Unique slug per organization
-DEFINE INDEX idx_project_org_slug ON project COLUMNS organization_id, slug UNIQUE;
+DEFINE INDEX idx_project_org_slug ON project COLUMNS slug UNIQUE;
 
--- ORG MEMBERSHIP EDGE
-DEFINE TABLE member_of_org SCHEMAFULL
-  PERMISSIONS FOR select, create, delete WHERE $auth.id != NONE;
+-- Define membership edge table
+-- TODO Add Persmissions
+DEFINE TABLE membership SCHEMAFULL TYPE RELATION FROM person|organization TO organization|project
+PERMISSIONS
+  FOR select, create WHERE $auth is not none;
+DEFINE FIELD role ON membership TYPE string ASSERT $value IN ['owner', 'admin', 'editor', 'viewer'];
+DEFINE FIELD joined_at ON membership TYPE datetime DEFAULT time::now();
+DEFINE INDEX unique_membership ON membership FIELDS in, out UNIQUE;
 
-DEFINE FIELD role      ON member_of_org TYPE string
-  ASSERT $value IN ["owner","admin","editor","viewer"];
 
-  DEFINE FIELD created_at ON member_of_org TYPE datetime
-      VALUE time::now() READONLY;
-
-  DEFINE FIELD updated_at ON member_of_org TYPE datetime
-      VALUE time::now()
-      DEFAULT ALWAYS time::now();
-
--- PROJECT MEMBERSHIP EDGE
-DEFINE TABLE member_of_project SCHEMAFULL
-  PERMISSIONS FOR select, create, delete WHERE $auth.id != NONE;
-
-DEFINE FIELD role      ON member_of_project TYPE string
-  ASSERT $value IN ["owner","admin","editor","viewer"];
-
-  DEFINE FIELD created_at ON member_of_project TYPE datetime
-      VALUE time::now() READONLY;
-
-  DEFINE FIELD updated_at ON member_of_project TYPE datetime
-      VALUE time::now()
-      DEFAULT ALWAYS time::now();
 
 -- INVITATION EDGE
 DEFINE TABLE invited SCHEMAFULL
