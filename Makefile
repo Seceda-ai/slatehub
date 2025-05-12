@@ -68,7 +68,7 @@ seed-admin-org:
 		-d '{\
 "ns":"'"$(SURREAL_NS)"'",\
 "db":"'"$(SURREAL_DB)"'",\
-"statements":[{"sql":"LET $$u = (SELECT id FROM person WHERE username = \"'"$(ADMIN_USERNAME)"'\" )[0].id; CREATE organization CONTENT { name: \"'"$(ADMIN_ORG_NAME)"'\", slug: \"'"$(ADMIN_ORG_NAME)"'\", created_at: time::now() }; LET $$o = (SELECT id FROM organization WHERE slug = \"'"$(ADMIN_ORG_NAME)"'\" )[0].id; CREATE member_of_org CONTENT { in: $$u, out: $$o, role: \"owner\", joined_at: time::now() };"}]\
+"statements":[{"sql":"BEGIN TRANSACTION; LET $$person = (SELECT id FROM person WHERE username = \"'"$(ADMIN_USERNAME)"'\" )[0].id; IF $$person == NONE THEN THROW \"Admin user not found\"; END; LET $$org = CREATE organization CONTENT { name: \"'"$(ADMIN_ORG_NAME)"'\", slug: \"'"$(ADMIN_ORG_NAME)"'\", created_at: time::now() }; CREATE member_of_org CONTENT { in: $$person, out: $$org.id, role: \"owner\", joined_at: time::now() }; COMMIT TRANSACTION;"}]\
 }'
 
 erase-db:

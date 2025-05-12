@@ -58,7 +58,7 @@ export async function getUserOrganizations(): Promise<Organization[]> {
   }
 }
 
-// Create a new organization
+// Create a new organization and set current user as owner
 export async function createOrganization(name: string): Promise<Organization> {
   if (!name || name.trim() === "") {
     throw new Error("Organization name is required");
@@ -70,19 +70,46 @@ export async function createOrganization(name: string): Promise<Organization> {
       await connect();
     }
 
-    // Use a transaction to create both organization and membership in one atomic operation
-    const result = await db.query<[[Organization]]>(
-      "CREATE organization SET name = $name RETURN *;",
+    // Use a transaction to create both organization and membership
+    const result = await db.query<
+      [{ organization: Organization; membership: any }]
+    >(
+      `
+      BEGIN TRANSACTION;
+
+      // Create the organization
+      LET $org = CREATE organization CONTENT {
+        name: $name
+      };
+
+      // Create the membership edge with owner role
+      LET $membership = CREATE member_of_org CONTENT {
+        in: $auth.id,
+        out: $org.id,
+        role: "${OWNER_ROLE}"
+      };
+
+      // Return the organization
+      RETURN {
+        organization: $org,
+        membership: $membership
+      };
+
+      COMMIT TRANSACTION;
+    `,
       { name },
     );
-    console.log("Hello:", JSON.stringify(result));
 
-    return result;
+    // Extract the organization from the result
+    if (!result[0]?.organization) {
+      throw new Error("Failed to create organization");
+    }
+
+    return result[0].organization;
   } catch (error) {
-    console.error("Error creating organization:", error);
-    throw new Error(
-      `Failed to create organization: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    // Simple error handling
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to create organization: ${message}`);
   }
 }
 
