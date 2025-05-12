@@ -14,12 +14,15 @@ DB_SERVICE    := db
 DB_URL        := http://127.0.0.1:8000
 SCHEMA_FILE   := backend/db/schema.surql
 FRONTEND_DIR  := $(FRONTEND_DIR)
+DB_DATA_DIR   := backend/db/data
+DB_FILES_DIR  := backend/db/files
 
 .PHONY: start-db stop-db init-db start-frontend dev \
         seed-admin-person seed-admin-org erase-db reset-db
 
 start-db:
 	@echo "→ Starting SurrealDB container…"
+	@mkdir -p $(DB_DATA_DIR) $(DB_FILES_DIR)
 	$(COMPOSE) up -d $(DB_SERVICE)
 
 stop-db:
@@ -34,7 +37,15 @@ init-db: start-db
 		--conn $(DB_URL) \
 		--user $(SURREAL_USER) --pass $(SURREAL_PASS) \
 		--namespace $(SURREAL_NS) --database $(SURREAL_DB) \
-		$(SCHEMA_FILE) 2>/dev/null || echo "Schema already exists or import had errors (this is usually OK if you've run this before)"
+		$(SCHEMA_FILE) 2>&1 || { \
+			echo "⚠️ Schema import encountered errors:"; \
+			surreal import \
+				--conn $(DB_URL) \
+				--user $(SURREAL_USER) --pass $(SURREAL_PASS) \
+				--namespace $(SURREAL_NS) --database $(SURREAL_DB) \
+				$(SCHEMA_FILE) 2>&1; \
+			echo "This may be OK if you've run this before and the schema already exists."; \
+		}
 
 start-frontend:
 	@echo "→ Launching Svelte frontend…"
@@ -61,9 +72,12 @@ seed-admin-org:
 }'
 
 erase-db:
-	@echo "→ Stopping and erasing DB data…"
+	@echo "→ Stopping and erasing DB data and storage…"
 	$(MAKE) stop-db
-	@rm -rf backend/db/data
+	@rm -rf $(DB_DATA_DIR)/*.db
+	@rm -rf $(DB_FILES_DIR)/*
+	@mkdir -p $(DB_DATA_DIR)
+	@mkdir -p $(DB_FILES_DIR)
 
 reset-db: erase-db
 	@$(MAKE) dev

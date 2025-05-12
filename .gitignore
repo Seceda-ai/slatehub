@@ -7,6 +7,8 @@ frontend/web/.env.*
 
 # SurrealDB (local DB file)
 backend/db/data/*.db
+backend/db/files/*
+!backend/db/files/.gitkeep
 
 # General .env files
 .env

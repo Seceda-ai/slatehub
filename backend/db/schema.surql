@@ -7,8 +7,7 @@ DEFINE ACCESS user_access ON DATABASE TYPE RECORD
       username    = string::lowercase($username),
       password    = crypto::argon2::generate($password),
       email       = string::lowercase($email),
-      global_role = "user",
-      created_at  = time::now()
+      global_role = "user"
   )
   SIGNIN (
     SELECT * FROM person
@@ -52,10 +51,10 @@ DEFINE INDEX idx_person_email    ON person COLUMNS email    UNIQUE;
 -- ORGANIZATION TABLE
 DEFINE TABLE organization SCHEMAFULL
    PERMISSIONS
-  --   FOR select, update, delete WHERE
-  --     $auth.global_role = "admin"
-  --     OR $auth.id IN (SELECT in FROM member_of_org WHERE out = $auth.id),
-     -- FOR select, create WHERE $auth != NONE;
+    FOR select, update, delete WHERE
+      $auth.global_role = "admin"
+      OR $auth.id IN (SELECT in FROM member_of_org WHERE out = $auth.id),
+     FOR select, create WHERE $auth != NONE;
 
 DEFINE FIELD name       ON organization TYPE string
   ASSERT $value != "";

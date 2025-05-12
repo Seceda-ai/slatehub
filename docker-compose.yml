@@ -1,17 +1,27 @@
 services:
   db:
+    # Official SurrealDB image with latest version
     image: surrealdb/surrealdb:latest
     container_name: surreal
     environment:
       - SURREAL_USER=${SURREAL_USER}
       - SURREAL_PASS=${SURREAL_PASS}
     volumes:
+      # Mount database directory for persistence
       - ./backend/db:/surrealdb
+      # Mount files directory for asset storage
+      - ./backend/db/files:/surrealdb/storage
+    # Command explanations:
+    # --allow-all: Allow all capabilities
+    # --allow-funcs: Allow execution of specific functions
+    # --temporary-directory: Configure directory for temporary files
     command: >
       start --log trace
       --user ${SURREAL_USER}
       --pass ${SURREAL_PASS}
       --bind 0.0.0.0:8000
-      file:///surrealdb/data/db.db
+      --allow-all
+      --temporary-directory /surrealdb/storage
+      rocksdb:///surrealdb/data/db.db
     ports:
       - "8000:8000"

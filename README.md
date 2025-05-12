@@ -13,6 +13,9 @@
 * Invitation and membership edges for social‑graph‑style collaboration
 * Fully containerized with Docker
 * Makefile‑driven workflow for development and seeding
+* File storage capabilities using SurrealDB's experimental features
+* API access with advanced SurrealDB experimental capabilities
+* Support for media and asset management via SurrealDB storage
 
 ---
 
@@ -32,6 +35,7 @@ slatehub/
 ├── backend/
 │   └── db/
 │       ├── data/                # SurrealDB data files
+│       ├── files/               # SurrealDB file storage directory
 │       └── schema.surql         # SurrealDB schema definitions
 ├── frontend/
 │   └── web/
@@ -103,7 +107,7 @@ All commands assume you’re in the project root (`slatehub/`).
 make start-db
 ```
 
-Spins up the SurrealDB container on `localhost:8000`.
+Spins up the SurrealDB container on `localhost:8000` with experimental features and file storage enabled.
 
 ### Import the schema
 
@@ -162,11 +166,81 @@ Runs `start-db`, `init-db`, and `start-frontend` in sequence.
   ```bash
   make erase-db
   ```
+  This will remove the database file and clean the storage directory.
+
 * **Tear down and rebuild everything**:
 
   ```bash
   make reset-db
   ```
+* **Storage locations**:
+  
+  The database file is stored in `backend/db/data` and uploaded files are stored in `backend/db/files`.
+
+---
+
+## Deployment
+
+When deploying Slatehub to production, you'll need to ensure SurrealDB is configured with experimental features and file storage enabled. These features are critical for full functionality of the application.
+
+### SurrealDB Configuration
+
+The Docker Compose configuration includes the following important flags for SurrealDB:
+
+* `--experimental`: Enables experimental SurrealDB features
+* `--allow-all`: Ensures all features are available
+* `--storage-fs-dir /surrealdb/storage`: Configures file storage directory
+
+The application uses the following directories for storage:
+
+* Database files: `backend/db/data/`
+* File storage: `backend/db/files/`
+
+When deploying manually or with other orchestration tools, ensure these flags are included in your SurrealDB startup command:
+
+```bash
+surrealdb start --user $USER --pass $PASS --bind 0.0.0.0:8000 \
+  --experimental \
+  --allow-all \
+  --storage-fs-dir /path/to/storage \
+  file:///path/to/database.db
+```
+
+### File Storage
+
+Slatehub uses SurrealDB's experimental file storage capabilities for managing production assets, which require:
+
+1. A directory on the host system mounted to the container
+2. The `--storage-fs-dir` flag pointing to this directory inside the container
+3. The `--experimental` flag to enable the storage functionality
+
+The configuration uses fixed paths for both the database file and storage locations:
+- Database file: `backend/db/data/db.db`
+- File storage directory: `backend/db/files/`
+
+The default configuration mounts `backend/db/files` to `/surrealdb/storage` in the container. In production, ensure this directory has:
+- Sufficient disk space for your assets
+- Appropriate backup procedures
+- Proper file permissions
+
+### Security Considerations
+
+In production environments:
+
+* Use secure credentials for SurrealDB
+* Consider implementing HTTPS with a reverse proxy like Nginx or Traefik
+* Review and adjust firewall rules to limit access to your SurrealDB instance
+* Back up both the database file and the file storage directory regularly
+* Be aware that `--allow-all` enables all capabilities - restrict network access accordingly
+* Consider setting up user-level permissions within SurrealDB for file storage access
+
+### Monitoring
+
+When using SurrealDB's experimental features in production:
+
+* Monitor the log output for any warnings related to experimental features
+* Keep your SurrealDB installation updated to the latest version
+* Subscribe to SurrealDB release announcements for updates on experimental features
 
 ---
 
