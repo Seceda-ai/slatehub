@@ -49,7 +49,8 @@ export async function getUserOrganizations(): Promise<Organization[]> {
     `);
 
     console.log("Get Orgs: \n", JSON.stringify(result, null, 2));
-    return result[0][0];
+    // return result[0][0];
+    return result[0][0] as unknown as Organization[];
   } catch (error) {
     console.error("Error fetching user organizations:", error);
     throw new Error(
@@ -124,18 +125,11 @@ export async function getOrganizationBySlug(
     const isId = slugOrId.includes(":") || slugOrId.includes("/");
 
     // Construct the appropriate query based on whether we have an ID or slug
-    const sql = isId
-      ? `SELECT * FROM ${slugOrId}
-       WHERE id IN (SELECT out FROM member_of_org WHERE in = $auth.id)`
-      : `SELECT * FROM organization
-       WHERE slug = $slug
-       AND id IN (SELECT out FROM member_of_org WHERE in = $auth.id)`;
+    const sql = `SELECT * FROM organization
+       WHERE slug = $slug;`;
 
     // Execute the query
-    const result = await db.query<[Organization[]]>(
-      sql,
-      isId ? {} : { slug: slugOrId },
-    );
+    const result = await db.query<[Organization[]]>(sql, { slug: slugOrId });
 
     // Return the first organization or null if none found
     if (result[0] && result[0].length > 0) {
