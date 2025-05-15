@@ -185,7 +185,7 @@
         </div>
       </div>
 
-      <!-- Organization projects will go here in the future -->
+      <!-- Organization productions will go here in the future -->
       
       <!-- Organization members management -->
       <div class="organization-members-section">

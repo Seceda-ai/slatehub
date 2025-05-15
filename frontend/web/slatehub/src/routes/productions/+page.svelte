@@ -2,22 +2,22 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import AuthGuard from '$lib/components/AuthGuard.svelte';
-  import OrganizationCard from '$lib/components/organizations/OrganizationCard.svelte';
-  import { getUserOrganizations, type Organization } from '$lib/db/organizations';
+  import ProductionCard from '$lib/components/productions/ProductionCard.svelte';
+  import { getUserProductions, type Production } from '$lib/db/productions';
 
   // State variables
-  let organizations: Organization[] = [];
+  let productions: Production[] = [];
   let isLoading = true;
   let error: string | null = null;
 
-  // Fetch organizations on mount
+  // Fetch productions on mount
   onMount(async () => {
     try {
       isLoading = true;
-      organizations = await getUserOrganizations();
+      productions = await getUserProductions();
     } catch (err: any) {
-      error = err.message || 'Failed to load organizations';
-      console.error('Error loading organizations:', err);
+      error = err.message || 'Failed to load productions';
+      console.error('Error loading productions:', err);
     } finally {
       isLoading = false;
     }
@@ -25,15 +25,15 @@
 </script>
 
 <svelte:head>
-  <title>My Organizations | Slatehub</title>
+  <title>My Productions | Slatehub</title>
 </svelte:head>
 
 <AuthGuard requireAuth={true}>
-  <div class="organizations-page">
+  <div class="productions-page">
     <div class="page-header">
-      <h1>My Organizations</h1>
-      <button class="btn btn-primary" on:click={() => goto('/organizations/new')}>
-        Create Organization
+      <h1>My Productions</h1>
+      <button class="btn btn-primary" on:click={() => goto('/productions/new')}>
+        Create Production
       </button>
     </div>
 
@@ -46,20 +46,20 @@
     {#if isLoading}
       <div class="loading">
         <span class="loading-spinner"></span>
-        <span>Loading organizations...</span>
+        <span>Loading productions...</span>
       </div>
-    {:else if organizations.length === 0}
+    {:else if productions.length === 0}
       <div class="empty-state">
-        <h2>No Organizations Yet</h2>
-        <p>Create your first organization to start collaborating on productions.</p>
-        <button class="btn btn-primary" on:click={() => goto('/organizations/new')}>
-          Create Organization
+        <h2>No Productions Yet</h2>
+        <p>Create your first production to start collaborating with your team.</p>
+        <button class="btn btn-primary" on:click={() => goto('/productions/new')}>
+          Create Production
         </button>
       </div>
     {:else}
-      <div class="organizations-list">
-        {#each organizations as organization (organization.id)}
-          <OrganizationCard {organization} />
+      <div class="productions-list">
+        {#each productions as production (production.id)}
+          <ProductionCard production={production} />
         {/each}
       </div>
     {/if}
@@ -67,7 +67,7 @@
 </AuthGuard>
 
 <style>
-  .organizations-page {
+  .productions-page {
     max-width: 900px;
     margin: 0 auto;
     padding: 1rem;
@@ -163,7 +163,7 @@
     text-decoration: none;
   }
 
-  .organizations-list {
+  .productions-list {
     display: flex;
     flex-direction: column;
     gap: 1rem;

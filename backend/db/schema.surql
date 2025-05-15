@@ -71,37 +71,56 @@ DEFINE FIELD updated_at ON organization TYPE datetime
 DEFINE INDEX idx_organization_slug ON organization COLUMNS slug UNIQUE;
 
 -- PROJECT TABLE
-DEFINE TABLE project SCHEMAFULL
-  PERMISSIONS
-    FOR select, update, delete WHERE
-      $auth.global_role = "admin"
-      OR $auth.id IN (SELECT in FROM member_of_project WHERE out = $auth.id),
-    FOR create WHERE $auth.id != NONE;
+DEFINE TABLE production SCHEMAFULL;
 
-DEFINE FIELD name             ON project TYPE string
+DEFINE FIELD title             ON production TYPE string
   ASSERT $value != "";
 
-DEFINE FIELD slug             ON project TYPE string
-  VALUE  string::slug(name)
-  DEFAULT string::slug(name);
+DEFINE FIELD slug             ON production TYPE string
+  VALUE  string::slug(title)
+  DEFAULT string::slug(title);
 
-DEFINE FIELD updated_at ON project TYPE datetime
-    VALUE time::now()
-    DEFAULT ALWAYS time::now();
+  DEFINE FIELD created_at ON production TYPE datetime
+      VALUE time::now() READONLY;
+
+  DEFINE FIELD updated_at ON production TYPE datetime
+      VALUE time::now()
+      DEFAULT ALWAYS time::now();
 
 -- Unique slug per organization
-DEFINE INDEX idx_project_org_slug ON project COLUMNS slug UNIQUE;
+DEFINE INDEX idx_production_org_slug ON production COLUMNS slug UNIQUE;
 
 -- Define membership edge table
 -- TODO Add Persmissions
-DEFINE TABLE membership SCHEMAFULL TYPE RELATION FROM person|organization TO organization|project
+DEFINE TABLE membership SCHEMAFULL TYPE RELATION FROM person|organization TO organization|production
 PERMISSIONS
   FOR select, create WHERE $auth is not none;
 DEFINE FIELD role ON membership TYPE string ASSERT $value IN ['owner', 'admin', 'editor', 'viewer'];
 DEFINE FIELD joined_at ON membership TYPE datetime DEFAULT time::now();
 DEFINE INDEX unique_membership ON membership FIELDS in, out UNIQUE;
 
-
+-- Define the role table
+DEFINE TABLE role SCHEMAFULL;
+DEFINE FIELD role_id ON role TYPE string;
+DEFINE FIELD standardized_title ON role TYPE string;
+DEFINE FIELD aliases ON role TYPE array;
+DEFINE FIELD aliases.* ON role TYPE string;
+DEFINE FIELD department ON role TYPE string;
+DEFINE FIELD description ON role TYPE string;
+DEFINE FIELD reports_to ON role TYPE option<record<role>>;
+DEFINE FIELD localizations ON role TYPE object;
+DEFINE FIELD localizations.en ON role TYPE string;
+DEFINE FIELD localizations.en_uk ON role TYPE string;
+DEFINE FIELD localizations.de ON role TYPE string;
+DEFINE FIELD localizations.fr ON role TYPE string;
+DEFINE FIELD localizations.it ON role TYPE string;
+DEFINE FIELD localizations.es ON role TYPE string;
+DEFINE FIELD localizations.pt ON role TYPE string;
+DEFINE FIELD localizations.nl ON role TYPE string;
+DEFINE FIELD external_references ON role TYPE object;
+DEFINE FIELD external_references.imdb ON role TYPE option<string>;
+DEFINE FIELD external_references.tmdb ON role TYPE option<string>;
+DEFINE INDEX role_id_index ON role FIELDS role_id UNIQUE;
 
 -- INVITATION EDGE
 DEFINE TABLE invited SCHEMAFULL

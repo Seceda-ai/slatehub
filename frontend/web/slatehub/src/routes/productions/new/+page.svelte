@@ -1,30 +1,30 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import AuthGuard from '$lib/components/AuthGuard.svelte';
-  import OrganizationForm from '$lib/components/organizations/OrganizationForm.svelte';
-  import type { Organization } from '$lib/db/organizations';
+  import ProductionForm from '$lib/components/productions/ProductionForm.svelte';
+  import type { Production } from '$lib/db/productions';
 
   let isSubmitting = false;
 
-  // Handle successful organization creation
-  function handleSuccess(event: CustomEvent<Organization>) {
-    const organization = event.detail;
-    if (organization && organization.id) {
-      console.log('Redirecting to organization page:', organization);
+  // Handle successful production creation
+  function handleSuccess(event: CustomEvent<Production>) {
+    const production = event.detail;
+    if (production && production.id) {
+      console.log('Redirecting to production page:', production);
       // Use either slug or ID for the route
-      const route = organization.slug 
-        ? `/organizations/${organization.slug}` 
-        : `/organizations/${organization.id}`;
+      const route = production.slug 
+        ? `/productions/${production.slug}` 
+        : `/productions/${production.id}`;
       goto(route);
     } else {
-      console.error('Invalid organization data received:', organization);
-      goto('/organizations');
+      console.error('Invalid production data received:', production);
+      goto('/productions');
     }
   }
 
-  // Handle error in organization creation
+  // Handle error in production creation
   function handleError(event: CustomEvent<string>) {
-    console.error('Error creating organization:', event.detail);
+    console.error('Error creating production:', event.detail);
     // Show error to user
     const errorMessage = document.getElementById('error-message');
     if (errorMessage) {
@@ -35,20 +35,20 @@
 
   // Handle cancel button click
   function handleCancel() {
-    goto('/organizations');
+    goto('/productions');
   }
 </script>
 
 <svelte:head>
-  <title>Create Organization | Slatehub</title>
+  <title>Create Production | Slatehub</title>
 </svelte:head>
 
 <AuthGuard requireAuth={true}>
-  <div class="new-organization-page">
+  <div class="new-production-page">
     <div class="page-header">
-      <h1>Create New Organization</h1>
+      <h1>Create New Production</h1>
       <p class="page-description">
-        Create an organization to collaborate with team members on productions
+        Create a production to collaborate with team members
       </p>
     </div>
     
@@ -56,7 +56,8 @@
     </div>
 
     <div class="form-container">
-      <OrganizationForm 
+      <ProductionForm 
+        production={null}
         {isSubmitting}
         on:success={handleSuccess}
         on:error={handleError}
@@ -67,7 +68,7 @@
 </AuthGuard>
 
 <style>
-  .new-organization-page {
+  .new-production-page {
     max-width: 800px;
     margin: 0 auto;
     padding: 1rem;

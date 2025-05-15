@@ -58,7 +58,7 @@
             <div class="welcome-back">
                 <h2>Welcome back, {$authState.user?.username || "User"}!</h2>
                 <div class="cta-buttons">
-                    <a href="/projects" class="btn btn-primary">My Projects</a>
+                    <a href="/productions" class="btn btn-primary">My Productions</a>
                     <a href="/organizations" class="btn btn-outline"
                         >My Organizations</a
                     >

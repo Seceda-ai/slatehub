@@ -20,7 +20,7 @@
     
     <div class="navbar-menu">
       {#if $authState.isAuthenticated}
-        <a href="/projects" class="navbar-item">Projects</a>
+        <a href="/productions" class="navbar-item">Productions</a>
         <a href="/organizations" class="navbar-item">Organizations</a>
         <div class="navbar-item dropdown">
           <button class="dropdown-trigger">
