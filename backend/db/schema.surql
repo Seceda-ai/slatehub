@@ -71,7 +71,9 @@ DEFINE FIELD updated_at ON organization TYPE datetime
 DEFINE INDEX idx_organization_slug ON organization COLUMNS slug UNIQUE;
 
 -- PROJECT TABLE
-DEFINE TABLE production SCHEMAFULL;
+DEFINE TABLE production SCHEMAFULL
+PERMISSIONS
+  FOR select, create WHERE $auth is not none;
 
 DEFINE FIELD title             ON production TYPE string
   ASSERT $value != "";
