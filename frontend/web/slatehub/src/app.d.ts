@@ -9,6 +9,12 @@ declare global {
 				username: string;
 				email?: string;
 				id?: string;
+				profileImages?: Array<{
+					id: string;
+					data: string;
+					created_at?: string;
+				}>;
+				activeImageId?: string;
 				[key: string]: any;
 			} | null;
 		}

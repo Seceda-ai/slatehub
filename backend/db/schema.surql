@@ -45,6 +45,7 @@ DEFINE FIELD global_role ON person TYPE string
       VALUE time::now()
       DEFAULT ALWAYS time::now();
 
+
 DEFINE INDEX idx_person_username ON person COLUMNS username UNIQUE;
 DEFINE INDEX idx_person_email    ON person COLUMNS email    UNIQUE;
 
@@ -124,8 +125,52 @@ DEFINE FIELD external_references.imdb ON role TYPE option<string>;
 DEFINE FIELD external_references.tmdb ON role TYPE option<string>;
 DEFINE INDEX role_id_index ON role FIELDS role_id UNIQUE;
 
+
+
 -- INVITATION EDGE
 DEFINE TABLE invited SCHEMAFULL
   PERMISSIONS FOR select, create, delete WHERE $auth.id != NONE;
 
 DEFINE FIELD invited_at ON invited TYPE datetime;
+
+-- PERSON-ROLE RELATIONSHIP
+DEFINE TABLE person_has_role SCHEMAFULL TYPE RELATION FROM person TO role
+  PERMISSIONS
+    FOR select WHERE true,
+    FOR create, update, delete WHERE in = $auth.id;
+
+DEFINE FIELD added_at ON person_has_role TYPE datetime DEFAULT time::now();
+DEFINE FIELD expertise_level ON person_has_role TYPE string DEFAULT "intermediate"
+  ASSERT $value IN ['beginner', 'intermediate', 'expert', 'professional'];
+DEFINE INDEX unique_person_role ON person_has_role FIELDS in, out UNIQUE;
+
+-- IMAGE SYSTEM
+
+-- Image table definition
+DEFINE TABLE image SCHEMAFULL
+  PERMISSIONS
+    FOR create WHERE $auth.id IS NOT NONE,
+    FOR update WHERE created_by = $auth.id,
+    FOR delete WHERE created_by = $auth.id;
+
+-- Image fields
+DEFINE FIELD data ON image TYPE string;
+DEFINE FIELD alt_text ON image TYPE string;
+DEFINE FIELD mime_type ON image TYPE string DEFAULT "image/png";
+DEFINE FIELD created_at ON image TYPE datetime DEFAULT time::now() READONLY;
+DEFINE FIELD created_by ON image TYPE record<person>;
+
+-- Image relation table for graph connections
+DEFINE TABLE has_image SCHEMAFULL
+  PERMISSIONS
+    FOR select WHERE true,
+    FOR create WHERE $auth.id IS NOT NONE,
+    FOR update WHERE out.created_by = $auth.id OR $auth.global_role = "admin",
+    FOR delete WHERE out.created_by = $auth.id OR $auth.global_role = "admin";
+
+-- Image relation fields
+DEFINE FIELD in ON has_image TYPE record<person|organization|production>;
+DEFINE FIELD out ON has_image TYPE record<image>;
+DEFINE FIELD category ON has_image TYPE string DEFAULT "";
+
+DEFINE INDEX has_image_category ON TABLE has_image COLUMNS category;

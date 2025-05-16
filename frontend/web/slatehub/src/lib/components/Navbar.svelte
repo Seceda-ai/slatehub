@@ -1,6 +1,7 @@
 <script>
   import { authState, signout } from '$lib/db/surreal';
   import { goto } from '$app/navigation';
+  import ProfileAvatar from '$lib/components/ProfileAvatar.svelte';
 
   async function handleSignout() {
     try {
@@ -8,6 +9,8 @@
       goto('/login');
     } catch (error) {
       console.error('Error signing out:', error);
+      // Force redirect to login page even if there was an error
+      goto('/login');
     }
   }
 </script>
@@ -24,7 +27,25 @@
         <a href="/organizations" class="navbar-item">Organizations</a>
         <div class="navbar-item dropdown">
           <button class="dropdown-trigger">
-            {$authState.user?.username || 'Account'}
+            <div class="profile-image">
+              {#if $authState.user}
+                <ProfileAvatar 
+                  user={{
+                    ...$authState.user,
+                    username: $authState.user?.username || 'User',
+                    profileImages: $authState.user?.profileImages || [],
+                    activeImageId: $authState.user?.activeImageId
+                  }} 
+                  size="sm" 
+                  customClass="navbar-avatar"
+                />
+              {:else}
+                <div class="avatar-placeholder">
+                  <span>?</span>
+                </div>
+              {/if}
+            </div>
+          <span class="username">{$authState.user?.username || 'Account'}</span>
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="6 9 12 15 18 9"></polyline>
             </svg>
@@ -52,6 +73,38 @@
     position: sticky;
     top: 0;
     z-index: 100;
+  }
+  
+    .profile-image {
+      margin-right: 8px;
+      display: flex;
+      align-items: center;
+    }
+  
+    /* Custom styling for the navbar avatar */
+    :global(.navbar-avatar) {
+      border: 2px solid white;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+    
+    /* Fallback avatar styling */
+    .avatar-placeholder {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background-color: var(--primary-color);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 14px;
+      border: 2px solid white;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+  
+  .username {
+    margin-right: 4px;
   }
   
   .navbar-container {

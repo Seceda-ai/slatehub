@@ -1,5 +1,5 @@
 import { Surreal } from "surrealdb";
-import { writable, type Writable } from "svelte/store";
+import { writable, type Writable, get } from "svelte/store";
 
 // Connection states
 export enum ConnectionState {
@@ -12,7 +12,14 @@ export enum ConnectionState {
 // Auth state
 export interface AuthState {
   isAuthenticated: boolean;
-  user: any | null;
+  user: Record<string, any> | null;
+  token: string | null;
+}
+
+// Type definition for auth state store value
+export interface AuthStateValue {
+  isAuthenticated: boolean;
+  user: Record<string, any> | null;
   token: string | null;
 }
 
@@ -21,7 +28,7 @@ export interface ErrorDetails {
   message: string | null;
   code?: number;
   details?: string;
-  raw?: any;
+  raw?: unknown;
 }
 
 // Database configuration interface
@@ -82,18 +89,28 @@ export async function connect(
     if (storedToken) {
       try {
         await db.authenticate(storedToken);
-        const info = await db.info();
+        const info = await db.info() || null;
 
-        authState.set({
-          isAuthenticated: true,
-          user: info,
-          token: storedToken,
-        });
-
-        console.log("Successfully restored previous session");
+        if (info) {
+          authState.set({
+            isAuthenticated: true,
+            user: info,
+            token: storedToken,
+          });
+          console.log("Successfully restored previous session");
+        } else {
+          throw new Error("User info is null after authentication");
+        }
       } catch (e) {
         console.warn("Invalid stored token, removing it:", e);
         localStorage.removeItem("surrealToken");
+        
+        // Clear auth state to ensure consistency
+        authState.set({
+          isAuthenticated: false,
+          user: null,
+          token: null,
+        });
       }
     }
 
@@ -161,9 +178,11 @@ export async function signup(
     }
 
     if (e && typeof e === "object") {
-      if ("code" in e) code = e.code;
-      if ("description" in e) details = e.description;
-      if ("information" in e) details = `${details}: ${e.information}`;
+      if ("code" in e && typeof e.code === "number") code = e.code;
+      if ("description" in e && typeof e.description === "string") details = e.description;
+      if ("information" in e && typeof e.information === "string") details = `${details}: ${e.information}`;
+      // Also check for details field that might come from SurrealDB
+      if ("details" in e && typeof e.details === "string") details = `${details}\n${e.details}`;
     }
 
     errorMessage.set(message);
@@ -207,16 +226,60 @@ export async function signin(username: string, password: string) {
     if (token) {
       localStorage.setItem("surrealToken", token);
 
-      // Get user info
-      const info = await db.info();
-
-      authState.set({
-        isAuthenticated: true,
-        user: { username, ...info },
-        token,
-      });
-
-      return { user: { username, ...info }, token };
+      // Get user info and profile data
+        const info = await db.info() || null;
+      
+        // Fetch additional profile data including images
+        const userId = info && 'id' in info ? info.id : null;
+        try {
+          if (userId) {
+            const profileData = await db.query(`
+              SELECT 
+                username,
+                email,
+                profile_images,
+                profile_image_active
+              FROM ${userId};
+            `);
+          
+            // Extract profile data if available
+            const profile = profileData && Array.isArray(profileData[0]) ? profileData[0][0] : null;
+          
+            // Combine info with profile data
+            const userData = { 
+              username, 
+              ...info,
+              ...(profile || {})
+            };
+  
+            authState.set({
+              isAuthenticated: true,
+              user: userData,
+              token,
+            });
+  
+            return { user: userData, token };
+          } else {
+            // Fallback if we can't get the user ID
+            authState.set({
+              isAuthenticated: true,
+              user: { username, ...info },
+              token,
+            });
+  
+            return { user: { username, ...info }, token };
+          }
+        } catch (profileErr) {
+          // If fetching profile data fails, still authenticate with basic info
+          console.warn("Error fetching profile data:", profileErr);
+          authState.set({
+            isAuthenticated: true,
+            user: { username, ...info },
+            token,
+          });
+        
+          return { user: { username, ...info }, token };
+        }
     } else {
       throw new Error("No authentication token returned");
     }
@@ -233,9 +296,9 @@ export async function signin(username: string, password: string) {
     }
 
     if (e && typeof e === "object") {
-      if ("code" in e) code = e.code;
-      if ("description" in e) details = e.description;
-      if ("information" in e) details = `${details}: ${e.information}`;
+      if ("code" in e && typeof e.code === "number") code = e.code;
+      if ("description" in e && typeof e.description === "string") details = e.description;
+      if ("information" in e && typeof e.information === "string") details = `${details}: ${e.information}`;
     }
 
     errorMessage.set(message);
@@ -253,8 +316,16 @@ export async function signin(username: string, password: string) {
 // Sign out
 export async function signout() {
   try {
-    // Invalidate the token on the server
-    await db.invalidate();
+    // Check if we're connected before invalidating
+    if (getConnectionState() === ConnectionState.CONNECTED) {
+      try {
+        // Invalidate the token on the server
+        await db.invalidate();
+      } catch (invalidateError) {
+        // Log the error but continue with local signout
+        console.warn("Error invalidating token on server:", invalidateError);
+      }
+    }
 
     // Remove from local storage
     localStorage.removeItem("surrealToken");
@@ -278,6 +349,14 @@ export async function signout() {
       details: "Error occurred while signing out",
     });
 
+    // Even if there's an error, we should reset the auth state to ensure the user is logged out
+    localStorage.removeItem("surrealToken");
+    authState.set({
+      isAuthenticated: false,
+      user: null,
+      token: null,
+    });
+    
     throw e;
   }
 }
@@ -295,10 +374,10 @@ export async function closeConnection() {
 }
 
 // Helper for running queries
-export async function query<T = any>(
+export async function query<T extends unknown[] = unknown[]>(
   sql: string,
   vars: Record<string, any> = {},
-) {
+): Promise<T> {
   try {
     errorMessage.set(null);
 
@@ -312,6 +391,7 @@ export async function query<T = any>(
   } catch (e) {
     console.error("Query error:", e);
 
+    // Extract error information
     const message = e instanceof Error ? e.message : "Query failed";
     errorMessage.set(message);
 
@@ -319,9 +399,15 @@ export async function query<T = any>(
     let code = 0;
 
     if (e && typeof e === "object") {
-      if ("code" in e) code = e.code;
-      if ("description" in e) details = e.description;
-      if ("information" in e) details = `${details}: ${e.information}`;
+      if ("code" in e && typeof e.code === "number") code = e.code;
+      if ("description" in e && typeof e.description === "string") details = e.description;
+      if ("information" in e && typeof e.information === "string") details = `${details}: ${e.information}`;
+      if ("details" in e && typeof e.details === "string") details = `${details}\n${e.details}`;
+      
+      // Handle SurrealDB specific errors
+      if ("message" in e && typeof e.message === "string" && e.message.includes("SurrealDB")) {
+        details = `SurrealDB error: ${details}`;
+      }
     }
 
     errorDetails.set({
@@ -354,9 +440,9 @@ export function isAuthenticated(): boolean {
 }
 
 // Helper for getting the current user
-export function getCurrentUser(): any | null {
+export function getCurrentUser(): Record<string, any> | null {
   let user = null;
-  authState.subscribe((state) => {
+  authState.subscribe((state: AuthStateValue) => {
     user = state.user;
   })();
   return user;

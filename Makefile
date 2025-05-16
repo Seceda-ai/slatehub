@@ -13,12 +13,13 @@ COMPOSE       := docker-compose
 DB_SERVICE    := db
 DB_URL        := http://127.0.0.1:8000
 SCHEMA_FILE   := backend/db/schema.surql
+ROLES_SCHEMA_FILE := backend/db/production_roles_schema.surql
 FRONTEND_DIR  := $(FRONTEND_DIR)
 DB_DATA_DIR   := backend/db/data
 DB_FILES_DIR  := backend/db/files
 
 .PHONY: start-db stop-db init-db start-frontend dev \
-        seed-admin-person seed-admin-org erase-db reset-db
+        seed-admin-person seed-admin-org erase-db reset-db seed-static
 
 start-db:
 	@echo "→ Starting SurrealDB container…"
@@ -81,3 +82,19 @@ erase-db:
 
 reset-db: erase-db
 	@$(MAKE) dev
+
+seed-static: start-db
+	@echo "→ Importing production roles schema…"
+	@surreal import \
+		--conn $(DB_URL) \
+		--user $(SURREAL_USER) --pass $(SURREAL_PASS) \
+		--namespace $(SURREAL_NS) --database $(SURREAL_DB) \
+		$(ROLES_SCHEMA_FILE) 2>&1 || { \
+			echo "⚠️ Roles schema import encountered errors:"; \
+			surreal import \
+				--conn $(DB_URL) \
+				--user $(SURREAL_USER) --pass $(SURREAL_PASS) \
+				--namespace $(SURREAL_NS) --database $(SURREAL_DB) \
+				$(ROLES_SCHEMA_FILE) 2>&1; \
+			echo "This may be OK if you've run this before and the roles already exist."; \
+		}

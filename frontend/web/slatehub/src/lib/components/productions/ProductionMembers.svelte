@@ -36,18 +36,30 @@
   async function loadMembers() {
     try {
       isLoading = true;
+      if (!productionId) {
+        error = 'Missing production ID';
+        members = [];
+        return;
+      }
       members = await getProductionMembers(productionId);
       error = null;
     } catch (err: any) {
       error = err.message || 'Failed to load members';
       console.error('Error loading members:', err);
+      members = [];
     } finally {
       isLoading = false;
     }
   }
 
   // Add a new member
+  // Handler functions
   async function handleAddMember() {
+    if (!productionId) {
+      error = 'Production ID is missing';
+      return;
+    }
+    
     if (!newUsername || !newRole) {
       error = 'Username and role are required';
       return;
@@ -73,6 +85,11 @@
 
   // Update member role
   async function handleUpdateRole(memberId: string) {
+    if (!memberId) {
+      error = 'Member ID is missing';
+      return;
+    }
+    
     if (!editRole) {
       error = 'Role is required';
       return;
@@ -96,6 +113,11 @@
 
   // Remove a member
   async function handleRemoveMember(memberId: string) {
+    if (!memberId) {
+      error = 'Member ID is missing';
+      return;
+    }
+    
     if (!confirm('Are you sure you want to remove this member?')) {
       return;
     }
@@ -116,7 +138,7 @@
   // Start editing a member's role
   function startEdit(member: ProductionMember) {
     editMemberId = member.id || null;
-    editRole = member.role;
+    editRole = member.role || 'viewer';
   }
 
   // Cancel editing
@@ -125,7 +147,8 @@
   }
 
   // Format role for display
-  function formatRole(role: string): string {
+  function formatRole(role: string | undefined): string {
+    if (!role) return 'Viewer';
     return role.charAt(0).toUpperCase() + role.slice(1);
   }
 </script>
@@ -205,7 +228,7 @@
     </div>
   {:else}
     <div class="members-list">
-      {#each members as member (member.id)}
+      {#each members.filter(m => m !== null && m !== undefined) as member (member.id || `member-${Math.random()}`)}
         <div class="member-item">
           <div class="member-info">
             <div class="member-username">{member.person?.username || 'Unknown'}</div>
@@ -256,7 +279,7 @@
                     ✏️
                   </button>
                   
-                  {#if !(member.role === 'owner' && !isOwner)}
+                  {#if !(member.role === 'owner' && !isOwner) && member.id}
                     <button 
                       class="btn btn-xs btn-icon btn-danger"
                       on:click={() => handleRemoveMember(member.id || '')}

@@ -21,7 +21,7 @@
   let editingRole: "owner" | "admin" | "editor" | "viewer" = "editor";
   
   // Helper functions to safely extract person data
-  function getPersonUsername(member: OrganizationMember): string {
+  function getPersonUsername(member: OrganizationMember | null | undefined): string {
     if (!member) return 'Unknown';
     
     const person = member.person;
@@ -40,7 +40,7 @@
     return 'Unknown';
   }
   
-  function getPersonEmail(member: OrganizationMember): string {
+  function getPersonEmail(member: OrganizationMember | null | undefined): string {
     if (!member) return '';
     
     const person = member.person;
@@ -59,7 +59,7 @@
     return '';
   }
   
-  function getPersonInitial(member: OrganizationMember): string {
+  function getPersonInitial(member: OrganizationMember | null | undefined): string {
     const username = getPersonUsername(member);
     return username !== 'Unknown' ? username.substring(0, 1).toUpperCase() : '?';
   }
@@ -78,7 +78,7 @@
       console.log('Loaded members:', members);
       
       // Filter out any invalid members and normalize the data structure
-      members = members.filter(m => m && typeof m === 'object')
+      members = (members || []).filter(m => m && typeof m === 'object')
         .map(member => {
           // Ensure we have consistent person data structure
           if (member.person) {
@@ -125,6 +125,11 @@
   
   // Update member role
   async function handleUpdateRole(memberId: string) {
+    if (!memberId) {
+      error = 'Invalid member ID';
+      return;
+    }
+    
     try {
       isSubmitting = true;
       await updateMemberRole(memberId, editingRole);
@@ -142,6 +147,11 @@
   
   // Remove member
   async function handleRemoveMember(memberId: string) {
+    if (!memberId) {
+      error = 'Invalid member ID';
+      return;
+    }
+    
     if (!confirm('Are you sure you want to remove this member from the organization?')) {
       return;
     }
@@ -163,7 +173,7 @@
   // Start editing a member's role
   function startEditingRole(member: OrganizationMember) {
     editingMemberId = member.id || null;
-    editingRole = member.role;
+    editingRole = member.role || 'viewer';
   }
   
   // Cancel editing
@@ -267,7 +277,7 @@
           </tr>
         </thead>
         <tbody>
-          {#each members as member (member?.id || Math.random())}
+          {#each members.filter(m => m !== null && m !== undefined) as member (member?.id || `member-${Math.random()}`)}
                     <tr>
                       <td class="member-info">
                         <span class="member-avatar">
@@ -287,8 +297,8 @@
                     <option value="viewer">Viewer</option>
                   </select>
                 {:else}
-                  <span class="role-badge role-{member.role}">
-                    {member.role}
+                  <span class="role-badge role-{member.role || 'viewer'}">
+                    {member.role || 'viewer'}
                   </span>
                 {/if}
               </td>

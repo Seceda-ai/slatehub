@@ -1,18 +1,38 @@
 <script>
-    import { authState, connect } from "$lib/db/surreal";
-    import { onMount } from "svelte";
+    import { authState, connect, getConnectionState, ConnectionState } from "$lib/db/surreal";
+    import { onMount, onDestroy } from "svelte";
     import { goto } from "$app/navigation";
 
     let welcomeMessage = "AI-Powered Production Management";
     let showDebugInfo = false;
+    let connectionError = false;
+    let isLoading = true;
+
+    // Create auth state subscription
+    const unsubscribe = authState.subscribe(state => {
+        // Auth state changes will trigger reactivity
+    });
 
     onMount(async () => {
-        // Try to connect to the database on page load
-        await connect();
+        try {
+            // Try to connect to the database on page load
+            await connect();
+            connectionError = false;
+        } catch (error) {
+            console.error("Connection error:", error);
+            connectionError = true;
+        } finally {
+            isLoading = false;
+        }
 
         // Only show debug info in development mode
         showDebugInfo =
             import.meta.env.DEV || import.meta.env.MODE === "development";
+    });
+    
+    onDestroy(() => {
+        // Clean up subscription
+        unsubscribe();
     });
 </script>
 
@@ -36,7 +56,17 @@
             <span class="ai-icon">🤖</span> AI-Enhanced Workflow
         </div>
 
-        {#if !$authState.isAuthenticated}
+        {#if isLoading}
+            <div class="loading-state">
+                <div class="loading-spinner"></div>
+                <p>Connecting to services...</p>
+            </div>
+        {:else if connectionError}
+            <div class="connection-error">
+                <p>Unable to connect to the server. Please check your internet connection and try again.</p>
+                <button class="btn btn-primary" on:click={() => window.location.reload()}>Retry</button>
+            </div>
+        {:else if !$authState.isAuthenticated}
             <div class="value-prop">
                 <p>
                     Streamline your entire production process with intelligent
@@ -267,6 +297,40 @@
         font-size: 0.9rem;
         color: #666;
         margin-top: 2rem;
+    }
+    
+    .loading-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        margin: 2rem 0;
+    }
+    
+    .loading-spinner {
+        display: inline-block;
+        width: 3rem;
+        height: 3rem;
+        border: 0.25rem solid rgba(0, 102, 204, 0.1);
+        border-radius: 50%;
+        border-top-color: var(--primary-color);
+        animation: spin 1s ease-in-out infinite;
+        margin-bottom: 1rem;
+    }
+    
+    @keyframes spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+    
+    .connection-error {
+        background-color: #f8d7da;
+        color: #721c24;
+        padding: 1rem;
+        text-align: center;
+        border-radius: var(--border-radius-md);
+        margin: 1rem 0;
     }
 
     @media (max-width: 768px) {
