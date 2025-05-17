@@ -102,28 +102,49 @@ DEFINE FIELD role ON membership TYPE string ASSERT $value IN ['owner', 'admin', 
 DEFINE FIELD joined_at ON membership TYPE datetime DEFAULT time::now();
 DEFINE INDEX unique_membership ON membership FIELDS in, out UNIQUE;
 
+-- Define the department table
+DEFINE TABLE department SCHEMAFULL
+PERMISSIONS
+FOR select WHERE true,
+FOR create, update, delete WHERE $auth.global_role = "admin";
+
+DEFINE FIELD name ON department TYPE string;
+DEFINE FIELD slug ON department TYPE string
+  VALUE  string::slug(name)
+  DEFAULT string::slug(name);
+DEFINE FIELD created_at ON department TYPE datetime
+    VALUE time::now() READONLY;
+
+DEFINE FIELD updated_at ON department TYPE datetime
+    VALUE time::now()
+    DEFAULT ALWAYS time::now();
+DEFINE INDEX department_name_idx ON department COLUMNS name UNIQUE;
+
 -- Define the role table
-DEFINE TABLE role SCHEMAFULL;
-DEFINE FIELD role_id ON role TYPE string;
-DEFINE FIELD standardized_title ON role TYPE string;
-DEFINE FIELD aliases ON role TYPE array;
-DEFINE FIELD aliases.* ON role TYPE string;
-DEFINE FIELD department ON role TYPE string;
+DEFINE TABLE role SCHEMAFULL
+PERMISSIONS
+FOR select where true,
+FOR create, update, delete WHERE $auth.global_role = "admin";
+DEFINE FIELD name ON role TYPE string;
+DEFINE FIELD slug ON role TYPE string
+  VALUE  string::slug(name)
+  DEFAULT string::slug(name);
+
 DEFINE FIELD description ON role TYPE string;
-DEFINE FIELD reports_to ON role TYPE option<record<role>>;
-DEFINE FIELD localizations ON role TYPE object;
-DEFINE FIELD localizations.en ON role TYPE string;
-DEFINE FIELD localizations.en_uk ON role TYPE string;
-DEFINE FIELD localizations.de ON role TYPE string;
-DEFINE FIELD localizations.fr ON role TYPE string;
-DEFINE FIELD localizations.it ON role TYPE string;
-DEFINE FIELD localizations.es ON role TYPE string;
-DEFINE FIELD localizations.pt ON role TYPE string;
-DEFINE FIELD localizations.nl ON role TYPE string;
-DEFINE FIELD external_references ON role TYPE object;
-DEFINE FIELD external_references.imdb ON role TYPE option<string>;
-DEFINE FIELD external_references.tmdb ON role TYPE option<string>;
-DEFINE INDEX role_id_index ON role FIELDS role_id UNIQUE;
+DEFINE FIELD created_at ON role TYPE datetime
+    VALUE time::now() READONLY;
+
+DEFINE FIELD updated_at ON role TYPE datetime
+    VALUE time::now()
+    DEFAULT ALWAYS time::now();
+DEFINE INDEX role_name_idx ON role COLUMNS name UNIQUE;
+DEFINE INDEX role_slug_idx ON role COLUMNS slug UNIQUE;
+
+-- Define role_belongs_to_department relation
+DEFINE TABLE belongs_to_department SCHEMAFULL TYPE RELATION FROM role TO department
+PERMISSIONS
+FOR select WHERE true,
+FOR create, update, delete WHERE $auth.global_role = "admin";
 
 
 
@@ -143,6 +164,16 @@ DEFINE FIELD added_at ON person_has_role TYPE datetime DEFAULT time::now();
 DEFINE FIELD expertise_level ON person_has_role TYPE string DEFAULT "intermediate"
   ASSERT $value IN ['beginner', 'intermediate', 'expert', 'professional'];
 DEFINE INDEX unique_person_role ON person_has_role FIELDS in, out UNIQUE;
+
+-- PERSON-DEPARTMENT RELATIONSHIP (for department preferences/specialization)
+DEFINE TABLE person_specializes_in SCHEMAFULL TYPE RELATION FROM person TO department
+  PERMISSIONS
+    FOR select WHERE true,
+    FOR create, update, delete WHERE in = $auth.id;
+
+DEFINE FIELD added_at ON person_specializes_in TYPE datetime DEFAULT time::now();
+DEFINE FIELD priority ON person_specializes_in TYPE int DEFAULT 0;
+DEFINE INDEX unique_person_department ON person_specializes_in FIELDS in, out UNIQUE;
 
 -- IMAGE SYSTEM
 
