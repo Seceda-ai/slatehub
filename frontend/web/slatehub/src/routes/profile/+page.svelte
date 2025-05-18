@@ -5,68 +5,32 @@
     import { onMount } from "svelte";
     import { getProfile } from "$lib/db/profile";
     import {
-        getAllRoles, 
-        getPersonRoles, 
-        addRoleToPerson, 
-        removeRoleFromPerson, 
-        updatePersonRoleExpertise,
-        getRolesByDepartment,
+        getAllRoles,
+        getPersonRoles,
+        addRoleToPerson,
+        removeRoleFromPerson,
         type Role,
-        type PersonRole
-    } from '$lib/db/roles';
-    import {
-        getAllDepartments,
-        getUserSpecializedDepartments,
-        addUserDepartmentSpecialization,
-        updateDepartmentPriority,
-        removeDepartmentSpecialization,
-        type Department,
-        type PersonDepartment
-    } from '$lib/db/departments';
-
-    // Define interfaces for our data types
-    interface Profile {
-        [key: string]: any;
-    }
+        type PersonRole,
+    } from "$lib/db/roles";
 
     // State variables
-    let profile: Profile | null = null;
+    let profile: any = null;
     let isLoading = true;
     let error: string | null = null;
 
     // Roles state
     let userRoles: PersonRole[] = [];
     let allRoles: Role[] = [];
-    let departments: Department[] = [];
-    let selectedDepartmentId: string = "";
-    let departmentRoles: Role[] = [];
     let selectedRoleId: string = "";
-    let selectedExpertiseLevel:
-        | "beginner"
-        | "intermediate"
-        | "expert"
-        | "professional" = "intermediate";
     let isLoadingRoles = false;
     let rolesError: string | null = null;
     let isAddingRole = false;
     let showRoleSelector = false;
-    
-    // Department specialization state
-    let userDepartments: PersonDepartment[] = [];
-    let selectedDepartmentForSpecialization: string = "";
-    let selectedPriority: number = 5;
-    let isLoadingDepartments = false;
-    let departmentsError: string | null = null;
-    let isAddingDepartment = false;
-    let showDepartmentSelector = false;
+    let roleSearchTerm: string = "";
+    let filteredRoles: Role[] = [];
 
     onMount(async () => {
-        await Promise.all([
-            loadProfile(), 
-            loadUserRoles(), 
-            loadDepartments(),
-            loadUserDepartments()
-        ]);
+        await Promise.all([loadProfile(), loadUserRoles(), loadAllRoles()]);
     });
 
     async function loadProfile() {
@@ -99,47 +63,12 @@
         }
     }
 
-    async function loadDepartments() {
+    async function loadAllRoles() {
         try {
-            departments = await getAllDepartments();
-            if (departments.length > 0) {
-                selectedDepartmentId = departments[0].id;
-                await loadDepartmentRoles(selectedDepartmentId);
-            }
-        } catch (err: unknown) {
-            const errorMsg =
-                err instanceof Error
-                    ? err.message
-                    : "Failed to load departments";
-            rolesError = errorMsg;
-            console.error("Error loading departments:", err);
-        }
-    }
-
-    async function loadUserDepartments() {
-        try {
-            isLoadingDepartments = true;
-            departmentsError = null;
-            userDepartments = await getUserSpecializedDepartments();
-        } catch (err: unknown) {
-            const errorMsg =
-                err instanceof Error
-                    ? err.message
-                    : "Failed to load specialized departments";
-            departmentsError = errorMsg;
-            console.error("Error loading user departments:", err);
-        } finally {
-            isLoadingDepartments = false;
-        }
-    }
-
-    async function loadDepartmentRoles(departmentId: string) {
-        try {
-            departmentRoles = await getRolesByDepartment(departmentId);
-            if (departmentRoles.length > 0) {
-                selectedRoleId = departmentRoles[0].id;
-            } else {
-                selectedRoleId = '';
+            allRoles = await getAllRoles();
+            filteredRoles = [...allRoles];
+            if (allRoles.length > 0) {
+                selectedRoleId = allRoles[0].id;
             }
         } catch (err: unknown) {
             const errorMsg =
@@ -149,56 +78,21 @@
         }
     }
 
-    async function handleDepartmentChange() {
-        await loadDepartmentRoles(selectedDepartmentId);
-    }
-    
-    async function handleAddDepartmentSpecialization() {
-        if (!selectedDepartmentForSpecialization) {
-            departmentsError = "Please select a department";
+    function filterRoles() {
+        if (!roleSearchTerm || roleSearchTerm.trim() === "") {
+            filteredRoles = [...allRoles];
             return;
         }
 
-        try {
-            isAddingDepartment = true;
-            departmentsError = null;
-            await addUserDepartmentSpecialization(selectedDepartmentForSpecialization, selectedPriority);
-            await loadUserDepartments();
-            showDepartmentSelector = false;
-        } catch (err: unknown) {
-            const errorMsg =
-                err instanceof Error ? err.message : "Failed to add department specialization";
-            departmentsError = errorMsg;
-            console.error("Error adding department specialization:", err);
-        } finally {
-            isAddingDepartment = false;
-        }
-    }
-
-    async function handleRemoveDepartmentSpecialization(personDeptId: string) {
-        try {
-            await removeDepartmentSpecialization(personDeptId);
-            await loadUserDepartments();
-        } catch (err: unknown) {
-            const errorMsg =
-                err instanceof Error ? err.message : "Failed to remove department specialization";
-            departmentsError = errorMsg;
-            console.error("Error removing department specialization:", err);
-        }
-    }
-
-    async function handleUpdatePriority(personDeptId: string, priority: number) {
-        try {
-            await updateDepartmentPriority(personDeptId, priority);
-            await loadUserDepartments();
-        } catch (err: unknown) {
-            const errorMsg =
-                err instanceof Error
-                    ? err.message
-                    : "Failed to update priority";
-            departmentsError = errorMsg;
-            console.error("Error updating priority:", err);
-        }
+        const searchTermLower = roleSearchTerm.toLowerCase();
+        filteredRoles = allRoles.filter(
+            (role) =>
+                role.name.toLowerCase().includes(searchTermLower) ||
+                (role.description &&
+                    role.description.toLowerCase().includes(searchTermLower)) ||
+                (role.slug &&
+                    role.slug.toLowerCase().includes(searchTermLower)),
+        );
     }
 
     async function handleAddRole() {
@@ -210,7 +104,8 @@
         try {
             isAddingRole = true;
             rolesError = null;
-            await addRoleToPerson(selectedRoleId, selectedExpertiseLevel);
+            // Add the role with default expertise level
+            await addRoleToPerson(selectedRoleId);
             await loadUserRoles();
             showRoleSelector = false;
         } catch (err: unknown) {
@@ -235,23 +130,6 @@
         }
     }
 
-    async function handleUpdateExpertise(
-        personRoleId: string,
-        expertiseLevel: "beginner" | "intermediate" | "expert" | "professional",
-    ) {
-        try {
-            await updatePersonRoleExpertise(personRoleId, expertiseLevel);
-            await loadUserRoles();
-        } catch (err: unknown) {
-            const errorMsg =
-                err instanceof Error
-                    ? err.message
-                    : "Failed to update expertise";
-            rolesError = errorMsg;
-            console.error("Error updating expertise:", err);
-        }
-    }
-
     async function handleSignout() {
         try {
             await signout();
@@ -259,6 +137,12 @@
         } catch (error) {
             console.error("Error signing out:", error);
         }
+    }
+
+    // Format roles as a comma-separated list
+    function getRolesList(roles: PersonRole[]): string {
+        if (!roles || roles.length === 0) return "No roles added yet";
+        return roles.map((role) => role.role.name).join(", ");
     }
 </script>
 
@@ -307,61 +191,78 @@
                     {:else if rolesError}
                         <p class="error-message">{rolesError}</p>
                     {:else}
+                        <!-- Show roles as comma-separated list -->
+                        <div
+                            class="roles-summary"
+                            class:empty={userRoles.length === 0}
+                        >
+                            {getRolesList(userRoles)}
+                        </div>
+
                         {#if showRoleSelector}
                             <div class="role-selector">
                                 <div class="form-group">
-                                    <label for="department">Department</label>
-                                    <select 
-                                        id="department" 
-                                        bind:value={selectedDepartmentId} 
-                                        on:change={handleDepartmentChange}
-                                        disabled={isAddingRole}
+                                    <label for="role-search"
+                                        >Search Available Roles</label
                                     >
-                                        {#each departments as department}
-                                            <option value={department.id}>{department.name}</option>
-                                        {/each}
-                                    </select>
+                                    <input
+                                        type="text"
+                                        id="role-search"
+                                        placeholder="Type to search roles..."
+                                        bind:value={roleSearchTerm}
+                                        on:input={filterRoles}
+                                        disabled={isAddingRole}
+                                    />
                                 </div>
 
                                 <div class="form-group">
-                                    <label for="role">Role</label>
+                                    <label for="role">Select a Role</label>
                                     <select
                                         id="role"
                                         bind:value={selectedRoleId}
                                         disabled={isAddingRole ||
-                                            departmentRoles.length === 0}
+                                            filteredRoles.length === 0}
+                                        size="5"
+                                        class="role-select"
                                     >
-                                        {#each departmentRoles as role}
+                                        {#each filteredRoles as role}
                                             <option value={role.id}
-                                                >{role.standardized_title}</option
+                                                >{role.name}</option
                                             >
                                         {/each}
                                     </select>
+                                    {#if filteredRoles.length === 0}
+                                        <p class="no-roles-found">
+                                            No roles found. Try another search
+                                            term.
+                                        </p>
+                                    {/if}
                                 </div>
 
-                                <div class="form-group">
-                                    <label for="expertise"
-                                        >Expertise Level</label
-                                    >
-                                    <select
-                                        id="expertise"
-                                        bind:value={selectedExpertiseLevel}
-                                        disabled={isAddingRole}
-                                    >
-                                        <option value="beginner"
-                                            >Beginner</option
-                                        >
-                                        <option value="intermediate"
-                                            >Intermediate</option
-                                        >
-                                        <option value="expert">Expert</option>
-                                        <option value="professional"
-                                            >Professional</option
-                                        >
-                                    </select>
+                                <div class="role-details">
+                                    {#if selectedRoleId}
+                                        {#each filteredRoles.filter((r) => r.id === selectedRoleId) as selectedRole}
+                                            <div class="selected-role-info">
+                                                <h4>{selectedRole.name}</h4>
+                                                {#if selectedRole.description}
+                                                    <p>
+                                                        {selectedRole.description}
+                                                    </p>
+                                                {/if}
+                                            </div>
+                                        {/each}
+                                    {/if}
                                 </div>
 
                                 <div class="action-buttons">
+                                    <button
+                                        class="btn btn-secondary"
+                                        on:click={() =>
+                                            (showRoleSelector = false)}
+                                        disabled={isAddingRole}
+                                    >
+                                        Cancel
+                                    </button>
                                     <button
                                         class="btn btn-primary"
                                         on:click={handleAddRole}
@@ -376,184 +277,31 @@
                             </div>
                         {/if}
 
-                        <div class="roles-list">
-                            {#if userRoles.length === 0}
-                                <p class="empty-state">
-                                    No roles added yet. Add your production
-                                    roles to showcase your expertise.
-                                </p>
-                            {:else}
+                        <!-- Role management list -->
+                        {#if userRoles.length > 0}
+                            <h3 class="section-title">Manage Your Roles</h3>
+                            <div class="roles-list">
                                 {#each userRoles as personRole}
                                     <div class="role-card">
                                         <div class="role-info">
-                                            <h3 class="role-title">
-                                                {personRole.role_details
-                                                    .standardized_title}
-                                            </h3>
-                                            <div class="role-departments">
-                                                {#if personRole.role_details.departments && personRole.role_details.departments.length > 0}
-                                                    {#each personRole.role_details.departments as dept}
-                                                        <span class="role-department">{dept.name}</span>
-                                                    {/each}
-                                                {:else}
-                                                    <span class="role-department">No department</span>
-                                                {/if}
-                                            </div>
-                                            <span
-                                                class="expertise-badge expertise-{personRole.expertise_level}"
-                                            >
-                                                {personRole.expertise_level}
+                                            <span class="role-title">
+                                                {personRole.role.name}
                                             </span>
                                         </div>
-                                        <div class="role-actions">
-                                            <select
-                                                class="expertise-select"
-                                                value={personRole.expertise_level}
-                                                on:change={(e) =>
-                                                    handleUpdateExpertise(
-                                                        personRole.id,
-                                                        e.target.value as any,
-                                                    )}
-                                            >
-                                                <option value="beginner"
-                                                    >Beginner</option
-                                                >
-                                                <option value="intermediate"
-                                                    >Intermediate</option
-                                                >
-                                                <option value="expert"
-                                                    >Expert</option
-                                                >
-                                                <option value="professional"
-                                                    >Professional</option
-                                                >
-                                            </select>
-                                            <button
-                                                class="btn btn-sm btn-danger"
-                                                on:click={() =>
-                                                    handleRemoveRole(
-                                                        personRole.id,
-                                                    )}
-                                            >
-                                                Remove
-                                            </button>
-                                        </div>
+                                        <button
+                                            class="btn btn-sm btn-danger"
+                                            on:click={() =>
+                                                handleRemoveRole(
+                                                    personRole.person_has_role_id,
+                                                )}
+                                            title="Remove this role"
+                                        >
+                                            ✕
+                                        </button>
                                     </div>
                                 {/each}
-                            {/if}
-                        </div>
-                    {/if}
-                </div>
-
-                <!-- Department Specializations Section -->
-                <div class="profile-field">
-                    <div class="field-header">
-                        <span class="field-label">Department Specializations</span>
-                        <button
-                            class="btn btn-sm btn-primary"
-                            on:click={() => (showDepartmentSelector = !showDepartmentSelector)}
-                        >
-                            {showDepartmentSelector ? "Cancel" : "Add Specialization"}
-                        </button>
-                    </div>
-
-                    {#if isLoadingDepartments}
-                        <p>Loading departments...</p>
-                    {:else if departmentsError}
-                        <p class="error-message">{departmentsError}</p>
-                    {:else}
-                        {#if showDepartmentSelector}
-                            <div class="role-selector">
-                                <div class="form-group">
-                                    <label for="specializationDepartment">Department</label>
-                                    <select
-                                        id="specializationDepartment"
-                                        bind:value={selectedDepartmentForSpecialization}
-                                        disabled={isAddingDepartment}
-                                    >
-                                        <option value="">-- Select Department --</option>
-                                        {#each departments as department}
-                                            <option value={department.id}>{department.name}</option>
-                                        {/each}
-                                    </select>
-                                </div>
-
-                                <div class="form-group">
-                                    <label for="priority">Priority (1-10)</label>
-                                    <input 
-                                        type="number" 
-                                        id="priority" 
-                                        bind:value={selectedPriority}
-                                        min="1"
-                                        max="10"
-                                        disabled={isAddingDepartment}
-                                    />
-                                    <small>Higher numbers indicate higher specialization</small>
-                                </div>
-
-                                <div class="action-buttons">
-                                    <button
-                                        class="btn btn-primary"
-                                        on:click={handleAddDepartmentSpecialization}
-                                        disabled={isAddingDepartment || !selectedDepartmentForSpecialization}
-                                    >
-                                        {isAddingDepartment
-                                            ? "Adding..."
-                                            : "Add Specialization"}
-                                    </button>
-                                </div>
                             </div>
                         {/if}
-
-                        <div class="roles-list">
-                            {#if userDepartments.length === 0}
-                                <p class="empty-state">
-                                    No department specializations added yet. Add department specializations to showcase your expertise areas.
-                                </p>
-                            {:else}
-                                {#each userDepartments as personDept}
-                                    <div class="role-card">
-                                        <div class="role-info">
-                                            <h3 class="role-title">
-                                                {personDept.department_details.name}
-                                            </h3>
-                                            {#if personDept.department_details.description}
-                                                <span class="department-description">
-                                                    {personDept.department_details.description}
-                                                </span>
-                                            {/if}
-                                            <span class="priority-badge" style="--priority-color: hsl({Math.min(personDept.priority * 12, 120)}, 80%, 40%)">
-                                                Priority: {personDept.priority}
-                                            </span>
-                                        </div>
-                                        <div class="role-actions">
-                                            <select
-                                                class="priority-select"
-                                                value={personDept.priority}
-                                                on:change={(e) =>
-                                                    handleUpdatePriority(
-                                                        personDept.id,
-                                                        parseInt(e.target.value)
-                                                    )}
-                                            >
-                                                {#each Array(10) as _, i}
-                                                    <option value={i + 1}>{i + 1}</option>
-                                                {/each}
-                                            </select>
-                                            <button
-                                                class="btn btn-sm btn-danger"
-                                                on:click={() =>
-                                                    handleRemoveDepartmentSpecialization(
-                                                        personDept.id
-                                                    )}
-                                            >
-                                                Remove
-                                            </button>
-                                        </div>
-                                    </div>
-                                {/each}
-                            {/if}
-                        </div>
                     {/if}
                 </div>
 
@@ -625,6 +373,28 @@
         margin-bottom: 1rem;
     }
 
+    .section-title {
+        font-size: 1.1rem;
+        color: var(--text-color);
+        margin: 1.5rem 0 1rem 0;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid var(--light-gray);
+    }
+
+    .roles-summary {
+        font-size: 1.1rem;
+        padding: 0.75rem;
+        background-color: #f8f9fa;
+        border-radius: var(--border-radius-sm);
+        margin-bottom: 1rem;
+        border-left: 3px solid var(--primary-color);
+    }
+
+    .roles-summary.empty {
+        color: #6c757d;
+        font-style: italic;
+    }
+
     .profile-actions {
         display: flex;
         gap: 1rem;
@@ -649,28 +419,72 @@
 
     .role-selector {
         background: #f8f9fa;
-        padding: 1rem;
+        padding: 1.5rem;
         border-radius: var(--border-radius-sm);
         margin-bottom: 1.5rem;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
     }
 
     .form-group {
-        margin-bottom: 1rem;
+        margin-bottom: 1.5rem;
     }
 
     .form-group label {
         display: block;
         margin-bottom: 0.5rem;
         font-size: 0.9rem;
+        font-weight: 500;
         color: #495057;
     }
 
-    .form-group select {
+    .form-group select,
+    .form-group input {
         width: 100%;
         padding: 0.5rem;
         border: 1px solid #ced4da;
         border-radius: var(--border-radius-sm);
         background-color: white;
+        font-size: 0.95rem;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+        border-color: var(--primary-color);
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.25);
+    }
+
+    .role-select {
+        height: auto;
+        min-height: 150px;
+    }
+
+    .no-roles-found {
+        color: #6c757d;
+        font-style: italic;
+        margin-top: 0.5rem;
+        font-size: 0.9rem;
+    }
+
+    .role-details {
+        background-color: white;
+        border: 1px solid #e9ecef;
+        border-radius: var(--border-radius-sm);
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+        min-height: 100px;
+    }
+
+    .selected-role-info h4 {
+        margin: 0 0 0.75rem 0;
+        color: var(--primary-color);
+        font-size: 1.1rem;
+    }
+
+    .selected-role-info p {
+        margin: 0 0 0.75rem 0;
+        color: #495057;
+        font-size: 0.95rem;
     }
 
     .roles-list {
@@ -683,112 +497,39 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 1rem;
+        padding: 0.5rem 0.75rem;
         background-color: #f8f9fa;
-        border-radius: var(--border-radius-sm);
-        border-left: 4px solid var(--primary-color);
-    }
-
-    .role-info {
-        display: flex;
-        flex-direction: column;
+        border-radius: 20px;
+        margin-bottom: 0.5rem;
+        border: 1px solid #e9ecef;
     }
 
     .role-title {
-        font-size: 1rem;
-        font-weight: 600;
-        margin: 0 0 0.25rem 0;
+        font-size: 0.95rem;
+        font-weight: 500;
+        margin: 0;
     }
 
-    .role-departments {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.25rem;
-        margin-bottom: 0.25rem;
-    }
-    
-    .role-department {
-        font-size: 0.8rem;
-        color: #fff;
-        background-color: #6c757d;
-        padding: 0.15rem 0.35rem;
-        border-radius: 0.25rem;
-    }
-    
-    .department-description {
-        font-size: 0.8rem;
-        color: #6c757d;
-        margin-bottom: 0.25rem;
-        font-style: italic;
-    }
-    
-    .priority-badge {
-        display: inline-block;
-        padding: 0.25rem 0.5rem;
-        font-size: 0.75rem;
-        border-radius: var(--border-radius-sm);
-        background-color: var(--priority-color, #6c757d);
-        color: white;
+    .btn-danger {
+        border: none;
+        background: none;
+        color: #dc3545;
+        font-size: 14px;
         font-weight: bold;
-    }
-    
-    .priority-select {
-        padding: 0.25rem;
-        border: 1px solid #ced4da;
-        border-radius: var(--border-radius-sm);
-        font-size: 0.8rem;
-        width: 5rem;
+        cursor: pointer;
+        padding: 0.2rem 0.5rem;
+        border-radius: 50%;
     }
 
-    .role-actions {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-    }
-
-    .expertise-select {
-        padding: 0.25rem;
-        border: 1px solid #ced4da;
-        border-radius: var(--border-radius-sm);
-        font-size: 0.8rem;
-    }
-
-    .expertise-badge {
-        display: inline-block;
-        padding: 0.25rem 0.5rem;
-        font-size: 0.75rem;
-        border-radius: var(--border-radius-sm);
-    }
-
-    .expertise-beginner {
-        background-color: #e2e3e5;
-        color: #383d41;
-    }
-
-    .expertise-intermediate {
-        background-color: #d1ecf1;
-        color: #0c5460;
-    }
-
-    .expertise-expert {
-        background-color: #d4edda;
-        color: #155724;
-    }
-
-    .expertise-professional {
-        background-color: #f8d7da;
-        color: #721c24;
-    }
-
-    .empty-state {
-        color: #6c757d;
-        font-style: italic;
-        text-align: center;
-        padding: 1rem 0;
+    .btn-danger:hover {
+        background-color: rgba(220, 53, 69, 0.1);
     }
 
     .action-buttons {
-        margin-top: 1rem;
+        margin-top: 1.5rem;
+        display: flex;
+        justify-content: flex-end;
+        gap: 1rem;
     }
 
     .btn-sm {
@@ -799,21 +540,19 @@
     @media (max-width: 600px) {
         .profile-card {
             text-align: center;
+            padding: 1.5rem 1rem;
         }
 
         .profile-actions {
             justify-content: center;
         }
 
-        .role-card {
+        .action-buttons {
             flex-direction: column;
-            align-items: flex-start;
         }
 
-        .role-actions {
-            margin-top: 1rem;
-            width: 100%;
-            justify-content: space-between;
+        .role-selector {
+            padding: 1rem;
         }
     }
 </style>

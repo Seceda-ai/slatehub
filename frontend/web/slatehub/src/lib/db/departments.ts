@@ -11,7 +11,7 @@ import type { AuthStateValue, AuthUser } from "$lib/db/profile";
 export interface Department {
     id: string;
     name: string;
-    slut: string;
+    slug: string;
     description?: string;
     created_at?: string;
     updated_at?: string;
@@ -40,6 +40,7 @@ export async function getAllDepartments(): Promise<Department[]> {
       SELECT
         id,
         name,
+        slug,
         description,
         created_at,
         updated_at
@@ -83,7 +84,7 @@ export async function getDepartmentsForRole(
         department.description,
         department.created_at,
         department.updated_at
-      FROM role_belongs_to_department
+      FROM belongs_to_department
       WHERE in = $roleId
       FETCH department;
     `,
@@ -119,13 +120,13 @@ export async function getUserSpecializedDepartments(): Promise<
         }
 
         // Get the current user's ID
-        let user: AuthUser | null = null;
-        const unsubscribe = authState.subscribe((state: AuthStateValue) => {
-            user = state.user as AuthUser;
+        let userId: string | null = null;
+        const unsubscribe = authState.subscribe((state) => {
+            userId = state.user?.id || null;
         });
         unsubscribe();
 
-        if (!user || !user.id) {
+        if (!userId) {
             throw new Error("User not authenticated");
         }
 
@@ -148,7 +149,7 @@ export async function getUserSpecializedDepartments(): Promise<
       WHERE in = $personId
       ORDER BY priority DESC, added_at DESC;
     `,
-            { personId: user.id },
+            { personId: userId },
         )) as any[];
 
         if (!result || !result[0] || result[0].length === 0) {
@@ -182,13 +183,13 @@ export async function addUserDepartmentSpecialization(
         }
 
         // Get the current user's ID
-        let user: AuthUser | null = null;
-        const unsubscribe = authState.subscribe((state: AuthStateValue) => {
-            user = state.user as AuthUser;
+        let userId: string | null = null;
+        const unsubscribe = authState.subscribe((state) => {
+            userId = state.user?.id || null;
         });
         unsubscribe();
 
-        if (!user || !user.id) {
+        if (!userId) {
             throw new Error("User not authenticated");
         }
 
@@ -217,7 +218,7 @@ export async function addUserDepartmentSpecialization(
       };
     `,
             {
-                personId: user.id,
+                personId: userId,
                 departmentId,
                 priority,
             },
@@ -252,13 +253,13 @@ export async function updateDepartmentPriority(
         }
 
         // Get the current user's ID
-        let user: AuthUser | null = null;
-        const unsubscribe = authState.subscribe((state: AuthStateValue) => {
-            user = state.user as AuthUser;
+        let userId: string | null = null;
+        const unsubscribe = authState.subscribe((state) => {
+            userId = state.user?.id || null;
         });
         unsubscribe();
 
-        if (!user || !user.id) {
+        if (!userId) {
             throw new Error("User not authenticated");
         }
 
@@ -285,7 +286,7 @@ export async function updateDepartmentPriority(
       };
     `,
             {
-                personId: user.id,
+                personId: userId,
                 personDeptId,
                 priority,
             },
@@ -318,13 +319,13 @@ export async function removeDepartmentSpecialization(
         }
 
         // Get the current user's ID
-        let user: AuthUser | null = null;
-        const unsubscribe = authState.subscribe((state: AuthStateValue) => {
-            user = state.user as AuthUser;
+        let userId: string | null = null;
+        const unsubscribe = authState.subscribe((state) => {
+            userId = state.user?.id || null;
         });
         unsubscribe();
 
-        if (!user || !user.id) {
+        if (!userId) {
             throw new Error("User not authenticated");
         }
 
@@ -334,7 +335,7 @@ export async function removeDepartmentSpecialization(
       DELETE person_specializes_in:$personDeptId WHERE in = $personId;
     `,
             {
-                personId: user.id,
+                personId: userId,
                 personDeptId,
             },
         );
@@ -372,9 +373,9 @@ export async function getRolesForDepartment(
         role.reports_to,
         role.localizations,
         role.external_references
-      FROM role_belongs_to_department
-      WHERE out = $departmentId
-      FETCH role;
+      FROM belongs_to_department
+    WHERE out = $departmentId
+    FETCH role;
     `,
             { departmentId },
         )) as any[];

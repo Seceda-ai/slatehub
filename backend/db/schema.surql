@@ -14,7 +14,7 @@ DEFINE ACCESS user_access ON DATABASE TYPE RECORD
     WHERE username = string::lowercase($username)
       AND crypto::argon2::compare(password, $password)
   )
-  DURATION FOR TOKEN 15m, FOR SESSION 14d;
+  DURATION FOR TOKEN 120m, FOR SESSION 14d;
 
 -- PERSON TABLE
 DEFINE TABLE person SCHEMAFULL
@@ -160,20 +160,8 @@ DEFINE TABLE person_has_role SCHEMAFULL TYPE RELATION FROM person TO role
     FOR select WHERE true,
     FOR create, update, delete WHERE in = $auth.id;
 
-DEFINE FIELD added_at ON person_has_role TYPE datetime DEFAULT time::now();
-DEFINE FIELD expertise_level ON person_has_role TYPE string DEFAULT "intermediate"
-  ASSERT $value IN ['beginner', 'intermediate', 'expert', 'professional'];
+DEFINE FIELD added_at ON person_has_role TYPE datetime VALUE time::now() READONLY;
 DEFINE INDEX unique_person_role ON person_has_role FIELDS in, out UNIQUE;
-
--- PERSON-DEPARTMENT RELATIONSHIP (for department preferences/specialization)
-DEFINE TABLE person_specializes_in SCHEMAFULL TYPE RELATION FROM person TO department
-  PERMISSIONS
-    FOR select WHERE true,
-    FOR create, update, delete WHERE in = $auth.id;
-
-DEFINE FIELD added_at ON person_specializes_in TYPE datetime DEFAULT time::now();
-DEFINE FIELD priority ON person_specializes_in TYPE int DEFAULT 0;
-DEFINE INDEX unique_person_department ON person_specializes_in FIELDS in, out UNIQUE;
 
 -- IMAGE SYSTEM
 
