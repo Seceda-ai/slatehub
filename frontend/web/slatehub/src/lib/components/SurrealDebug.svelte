@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { onMount } from 'svelte';
   import { errorDetails, errorMessage, connectionState, ConnectionState, authState } from '$lib/db/surreal';
 
@@ -12,11 +12,12 @@
   }
   
   // Format JSON for display
-  function formatJson(obj) {
+  function formatJson(obj: any) {
     try {
       return JSON.stringify(obj, null, 2);
-    } catch (error) {
-      return `Error formatting JSON: ${error.message}`;
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      return `Error formatting JSON: ${errorMessage}`;
     }
   }
   

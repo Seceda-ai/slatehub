@@ -5,19 +5,17 @@ import {
   ConnectionState,
   authState,
 } from "$lib/db/surreal";
+import { get } from "svelte/store";
 import type { Writable } from "svelte/store";
 
-// Type definition for auth state store value
-export interface AuthStateValue {
+// Type for SurrealDB auth state store 
+export interface AuthState {
   isAuthenticated: boolean;
-  user: AuthUser | null;
+  user: Record<string, any> | null;
   token: string | null;
 }
 
-// Define custom query result type to help with type assertions
-type QueryResult<T> = [T] | [T[]] | any[];
-
-// Type definition for user from auth state
+// We'll use this for strong typing in our functions
 export interface AuthUser {
   id: string;
   username?: string;
@@ -26,6 +24,11 @@ export interface AuthUser {
   profile_image_active?: string;
   [key: string]: any;
 }
+
+// Define custom query result type to help with type assertions
+type QueryResult<T> = [T] | [T[]] | any[];
+
+// Types for profile images
 
 // Types for profile images
 export interface ProfileImage {
@@ -37,12 +40,41 @@ export interface ProfileImage {
 export interface Profile {
   username: string;
   email: string;
+  full_name?: string;
+  location?: string;
+  phone?: {
+    country_code?: string;
+    number?: string;
+  };
+  social?: {
+    discord?: string;
+    instagram?: string;
+  };
   profile_images: ProfileImage[];
   profile_image_active?: string; // ID of the active profile image
   global_role: string;
   id?: string;
   created_at?: string;
   updated_at?: string;
+}
+
+export interface ProfileUpdateData {
+  full_name?: string;
+  location?: string;
+  phone?: {
+    country_code?: string;
+    number?: string;
+  };
+  social?: {
+    discord?: string;
+    instagram?: string;
+  };
+}
+
+export interface CredentialsUpdateData {
+  username?: string;
+  currentPassword: string;
+  newPassword?: string;
 }
 
 /**
@@ -55,15 +87,15 @@ export async function getProfile(): Promise<Profile | null> {
       await connect();
     }
 
-    // Get the current user's ID
-    let user: AuthUser | null = null;
-    const unsubscribe = authState.subscribe((state: AuthStateValue) => {
-      user = state.user as AuthUser;
-    });
-    unsubscribe();
-
-    if (!user || !user.id) {
+    // Get the current user's ID from auth state
+    const state = get(authState);
+    if (!state.user || !state.isAuthenticated) {
       throw new Error("User not authenticated");
+    }
+    
+    const userId = state.user.id as string;
+    if (!userId) {
+      throw new Error("User ID not found");
     }
 
     // Fetch the profile data
@@ -72,12 +104,16 @@ export async function getProfile(): Promise<Profile | null> {
         id,
         username,
         email,
+        full_name,
+        location,
+        phone,
+        social,
         global_role,
         created_at,
         updated_at,
         profile_images,
         profile_image_active
-      FROM ${user.id};
+      FROM ${userId};
     `) as any[];
 
     if (!result || !result[0] || (Array.isArray(result[0]) && result[0].length === 0)) {
@@ -104,15 +140,15 @@ export async function uploadProfileImage(imageData: string): Promise<ProfileImag
       await connect();
     }
 
-    // Get the current user's ID
-    let user: AuthUser | null = null;
-    const unsubscribe = authState.subscribe((state: AuthStateValue) => {
-      user = state.user as AuthUser;
-    });
-    unsubscribe();
-
-    if (!user || !user.id) {
+    // Get the current user's ID from auth state
+    const state = get(authState);
+    if (!state.user || !state.isAuthenticated) {
       throw new Error("User not authenticated");
+    }
+    
+    const userId = state.user.id as string;
+    if (!userId) {
+      throw new Error("User ID not found");
     }
 
     // Generate a unique ID for the image
@@ -130,7 +166,7 @@ export async function uploadProfileImage(imageData: string): Promise<ProfileImag
       };
       
       // Update the user's profile_images array
-      LET $profile = UPDATE ${user.id} CONTENT {
+      LET $profile = UPDATE ${userId} CONTENT {
         profile_images: array::concat(profile_images || [], [$image]),
         profile_image_active: profile_image_active || $imageId
       };
@@ -151,17 +187,21 @@ export async function uploadProfileImage(imageData: string): Promise<ProfileImag
     }
 
     // Update auth state with new profile image
-    if (user) {
-      const currentUser: AuthUser = { ...user };
-      authState.update((state: AuthStateValue) => ({
+    authState.update((state) => {
+      if (!state.user) return state;
+      
+      // Get current profile images or empty array
+      const currentImages = state.user.profile_images || [];
+      
+      return {
         ...state,
         user: {
-          ...currentUser,
-          profile_images: [...(currentUser.profile_images || []), result[0].image as ProfileImage],
-          profile_image_active: currentUser.profile_image_active || imageId
-        } as AuthUser
-      }));
-    }
+          ...state.user,
+          profile_images: [...currentImages, result[0].image],
+          profile_image_active: state.user.profile_image_active || imageId
+        }
+      };
+    });
 
     return result[0].image as ProfileImage;
   } catch (error: any) {
@@ -183,14 +223,15 @@ export async function deleteProfileImage(imageId: string): Promise<boolean> {
       await connect();
     }
 
-    // Get the current user's ID
-    let user: AuthUser | null = null;
-    (authState as Writable<AuthStateValue>).subscribe((state: AuthStateValue) => {
-      user = state.user as AuthUser;
-    })();
-
-    if (!user || !user.id) {
+    // Get the current user's ID from auth state
+    const state = get(authState);
+    if (!state.user || !state.isAuthenticated) {
       throw new Error("User not authenticated");
+    }
+    
+    const userId = state.user.id as string;
+    if (!userId) {
+      throw new Error("User ID not found");
     }
 
     // Update the user's profile_images array to remove the image with the given ID
@@ -198,7 +239,7 @@ export async function deleteProfileImage(imageId: string): Promise<boolean> {
       BEGIN TRANSACTION;
       
       // Get the current profile data
-      LET $current = (SELECT profile_images, profile_image_active FROM ${user.id})[0];
+      LET $current = (SELECT profile_images, profile_image_active FROM ${userId})[0];
       
       // Filter out the image to delete
       LET $updatedImages = array::filter($current.profile_images, function($img) {
@@ -211,7 +252,7 @@ export async function deleteProfileImage(imageId: string): Promise<boolean> {
         : $current.profile_image_active;
       
       // Update the user's profile
-      UPDATE ${user.id} CONTENT {
+      UPDATE ${userId} CONTENT {
         profile_images: $updatedImages,
         profile_image_active: $newActiveImage
       };
@@ -220,22 +261,22 @@ export async function deleteProfileImage(imageId: string): Promise<boolean> {
     `, { imageId });
 
     // Update auth state with new profile image data
-    authState.update((state: AuthStateValue) => {
+    authState.update((state) => {
       if (!state.user) return state;
       
-      const currentUser: AuthUser = { ...state.user };
-      const isActiveImageDeleted = currentUser.profile_image_active === imageId;
-      const updatedImages = (currentUser.profile_images || []).filter((img: ProfileImage) => img.id !== imageId);
+      const isActiveImageDeleted = state.user.profile_image_active === imageId;
+      const currentImages = state.user.profile_images || [];
+      const updatedImages = currentImages.filter((img: ProfileImage) => img.id !== imageId);
       
       return {
         ...state,
         user: {
-          ...currentUser,
+          ...state.user,
           profile_images: updatedImages,
           profile_image_active: isActiveImageDeleted && updatedImages.length > 0
             ? updatedImages[0].id
-            : (isActiveImageDeleted ? null : currentUser.profile_image_active)
-        } as AuthUser
+            : (isActiveImageDeleted ? null : state.user.profile_image_active)
+        }
       };
     });
 
@@ -259,15 +300,15 @@ export async function setActiveProfileImage(imageId: string): Promise<boolean> {
       await connect();
     }
 
-    // Get the current user's ID
-    let user: AuthUser | null = null;
-    const unsubscribe = authState.subscribe((state: AuthStateValue) => {
-      user = state.user as AuthUser;
-    });
-    unsubscribe();
-
-    if (!user || !user.id) {
+    // Get the current user's ID from auth state
+    const state = get(authState);
+    if (!state.user || !state.isAuthenticated) {
       throw new Error("User not authenticated");
+    }
+    
+    const userId = state.user.id as string;
+    if (!userId) {
+      throw new Error("User ID not found");
     }
 
     // Make sure the image exists in the user's profile_images array
@@ -278,13 +319,13 @@ export async function setActiveProfileImage(imageId: string): Promise<boolean> {
 
     // Update the user's profile_image_active field
     await db.query(`
-      UPDATE ${user.id} CONTENT {
+      UPDATE ${userId} CONTENT {
         profile_image_active: $imageId
       };
     `, { imageId });
 
     // Update auth state with new active profile image
-    authState.update((state: AuthStateValue) => {
+    authState.update((state) => {
       if (!state.user) return state;
       
       return {
@@ -292,7 +333,7 @@ export async function setActiveProfileImage(imageId: string): Promise<boolean> {
         user: {
           ...state.user,
           profile_image_active: imageId
-        } as AuthUser
+        }
       };
     });
 
@@ -309,15 +350,233 @@ export async function setActiveProfileImage(imageId: string): Promise<boolean> {
  * Gets the active profile image for the current user
  */
 export function getActiveProfileImage(): ProfileImage | null {
-  let user: AuthUser | null = null;
-  const unsubscribe = authState.subscribe((state: AuthStateValue) => {
-    user = state.user as AuthUser;
-  });
-  unsubscribe();
-
-  if (!user || !user.profile_images || !user.profile_image_active) {
+  const state = get(authState);
+  if (!state.user) {
+    return null;
+  }
+  
+  const activeId = state.user.profile_image_active;
+  const images = state.user.profile_images as ProfileImage[] || [];
+  
+  if (!activeId || images.length === 0) {
     return null;
   }
 
-  return user.profile_images.find((img: ProfileImage) => img.id === user.profile_image_active) || null;
+  return images.find(img => img.id === activeId) || null;
+}
+
+/**
+ * Updates the current user's profile information
+ * @param data The profile data to update
+ */
+export async function updateProfile(data: ProfileUpdateData): Promise<Profile> {
+  try {
+    // Ensure we're connected
+    if (getConnectionState() !== ConnectionState.CONNECTED) {
+      await connect();
+    }
+
+    // Get the current user's ID from auth state
+    const state = get(authState);
+    if (!state.user || !state.isAuthenticated) {
+      throw new Error("User not authenticated");
+    }
+    
+    const userId = state.user.id as string;
+    if (!userId) {
+      throw new Error("User ID not found");
+    }
+
+    // Update the profile data
+    const result = await db.query(`
+      UPDATE ${userId} CONTENT {
+        full_name: $full_name,
+        location: $location,
+        phone: $phone,
+        social: $social,
+        updated_at: time::now()
+      }
+      RETURN 
+        id,
+        username,
+        email,
+        full_name,
+        location,
+        phone,
+        social,
+        global_role,
+        created_at,
+        updated_at,
+        profile_images,
+        profile_image_active;
+    `, { 
+      full_name: data.full_name, 
+      location: data.location, 
+      phone: data.phone, 
+      social: data.social 
+    }) as any[];
+
+    if (!result || !result[0] || (Array.isArray(result[0]) && result[0].length === 0)) {
+      throw new Error("Failed to update profile");
+    }
+
+    const updatedProfile = Array.isArray(result[0]) ? result[0][0] as Profile : result[0] as Profile;
+
+    // Update auth state with new profile data
+    authState.update((state) => {
+      if (!state.user) return state;
+      
+      return {
+        ...state,
+        user: {
+          ...state.user,
+          ...data
+        }
+      };
+    });
+
+    return updatedProfile;
+  } catch (error: any) {
+    console.error("Error updating profile:", error);
+    throw new Error(
+      `Failed to update profile: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+
+/**
+ * Updates the user's credentials (username and/or password)
+ * @param data The credentials data to update
+ */
+export async function updateCredentials(data: CredentialsUpdateData): Promise<Profile> {
+  try {
+    // Ensure we're connected
+    if (getConnectionState() !== ConnectionState.CONNECTED) {
+      await connect();
+    }
+
+    // Get the current user's ID from auth state
+    const state = get(authState);
+    if (!state.user || !state.isAuthenticated) {
+      throw new Error("User not authenticated");
+    }
+    
+    const userId = state.user.id as string;
+    if (!userId) {
+      throw new Error("User ID not found");
+    }
+
+    // Verify the current password first
+    const verifyResult = await db.query(`
+      SELECT * FROM ${userId}
+      WHERE crypto::argon2::compare(password, $currentPassword);
+    `, { 
+      currentPassword: data.currentPassword
+    }) as any[];
+
+    // Check if the password verification failed
+    if (!verifyResult[0] || verifyResult[0].length === 0) {
+      throw new Error("Current password is incorrect");
+    }
+
+    // Build the update content based on what's being changed
+    let updateContent = {};
+    let params: any = {};
+
+    if (data.username) {
+      // Check if username already exists
+      const usernameCheck = await db.query(`
+        SELECT * FROM person 
+        WHERE username = $username 
+        AND id != $userId;
+      `, { 
+        username: data.username.toLowerCase(), 
+        userId 
+      }) as any[];
+
+      if (usernameCheck[0] && usernameCheck[0].length > 0) {
+        throw new Error("Username already exists");
+      }
+
+      updateContent = { ...updateContent, username: data.username.toLowerCase() };
+      params.username = data.username.toLowerCase();
+    }
+
+    if (data.newPassword) {
+      // Generate hash for new password
+      const hashedPassword = await db.query(`
+        RETURN crypto::argon2::generate($password);
+      `, { 
+        password: data.newPassword 
+      }) as any[];
+
+      if (!hashedPassword[0]) {
+        throw new Error("Failed to hash new password");
+      }
+
+      updateContent = { ...updateContent, password: hashedPassword[0] };
+      params.password = hashedPassword[0];
+    }
+
+    // If no changes requested, return current profile
+    if (Object.keys(updateContent).length === 0) {
+      return getProfile() as Promise<Profile>;
+    }
+
+    // Update the credentials
+    params.userId = userId;
+    
+    // Create dynamic query based on what's being updated
+    let updateFields = '';
+    if (params.username) updateFields += 'username: $username,\n';
+    if (params.password) updateFields += 'password: $password,\n';
+    updateFields += 'updated_at: time::now()';
+    
+    const result = await db.query(`
+      UPDATE $userId CONTENT {
+        ${updateFields}
+      }
+      RETURN 
+        id,
+        username,
+        email,
+        full_name,
+        location,
+        phone,
+        social,
+        global_role,
+        created_at,
+        updated_at,
+        profile_images,
+        profile_image_active;
+    `, params) as any[];
+
+    if (!result || !result[0] || (Array.isArray(result[0]) && result[0].length === 0)) {
+      throw new Error("Failed to update credentials");
+    }
+
+    const updatedProfile = Array.isArray(result[0]) ? result[0][0] as Profile : result[0] as Profile;
+
+    // Update auth state with new username if it was changed
+    if (data.username) {
+      authState.update((state) => {
+        if (!state.user) return state;
+        
+        return {
+          ...state,
+          user: {
+            ...state.user,
+            username: data.username?.toLowerCase()
+          }
+        };
+      });
+    }
+
+    return updatedProfile;
+  } catch (error: any) {
+    console.error("Error updating credentials:", error);
+    throw new Error(
+      `Failed to update credentials: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
 }

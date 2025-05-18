@@ -33,6 +33,30 @@ DEFINE FIELD email ON person TYPE string
   VALUE  string::lowercase($value)
   ASSERT string::is::email($value);
 
+-- Full name field
+DEFINE FIELD full_name ON person TYPE string
+  DEFAULT"";
+
+-- Location field
+DEFINE FIELD location ON person TYPE string
+  DEFAULT "";
+
+-- Phone number fields
+DEFINE FIELD phone ON person TYPE object
+  DEFAULT { country_code: "", number: "" };
+DEFINE FIELD phone.country_code ON person TYPE string
+  DEFAULT "";
+DEFINE FIELD phone.number ON person TYPE string
+  DEFAULT "";
+
+-- Social media handles
+DEFINE FIELD social ON person TYPE object
+  DEFAULT { discord: "", instagram: "" };
+DEFINE FIELD social.discord ON person TYPE string
+  DEFAULT "";
+DEFINE FIELD social.instagram ON person TYPE string
+  DEFAULT "";
+
   --TODO SET PERMS
 DEFINE FIELD global_role ON person TYPE string
   VALUE  $value ?? "user"

@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
     import { onMount } from 'svelte';
     import { connect, signin, signup, signout, query, errorDetails, errorMessage, connectionState, ConnectionState, authState, db, getConnectionState } from '$lib/db/surreal';
     import SurrealDebug from '$lib/components/SurrealDebug.svelte';
@@ -18,8 +18,9 @@
         try {
             await connect();
             completeOperation('Successfully connected to database');
-        } catch (error) {
-            failOperation(`Connection failed: ${error.message}`);
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            failOperation(`Connection failed: ${errorMessage}`);
         }
     }
 
@@ -34,9 +35,10 @@
         try {
             // Sign in with the correct parameters
             const result = await signin(username, password);
-            completeOperation('Sign in successful', result);
-        } catch (error) {
-            failOperation(`Sign in failed: ${error.message}`);
+            completeOperation('Sign in successful', result as unknown);
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            failOperation(`Sign in failed: ${errorMessage}`);
         }
     }
 
@@ -50,9 +52,10 @@
         try {
             // Sign up with the correct parameters
             const result = await signup(username, email, password);
-            completeOperation('Sign up successful', result);
-        } catch (error) {
-            failOperation(`Sign up failed: ${error.message}`);
+            completeOperation('Sign up successful', result as unknown);
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            failOperation(`Sign up failed: ${errorMessage}`);
         }
     }
 
@@ -61,8 +64,9 @@
         try {
             await signout();
             completeOperation('Sign out successful');
-        } catch (error) {
-            failOperation(`Sign out failed: ${error.message}`);
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            failOperation(`Sign out failed: ${errorMessage}`);
         }
     }
 
@@ -72,21 +76,22 @@
         try {
             const vars = JSON.parse(queryVars);
             const result = await query(queryText, vars);
-            completeOperation('Query executed successfully', result);
+            completeOperation('Query executed successfully', result as unknown);
             queryResult = JSON.stringify(result, null, 2);
-        } catch (error) {
-            failOperation(`Query failed: ${error.message}`);
-            queryResult = error.message;
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            failOperation(`Query failed: ${errorMessage}`);
+            queryResult = errorMessage;
         }
     }
 
     // Helper functions
-    function startOperation(message) {
+    function startOperation(message: string) {
         operationStatus = message;
         operationTime = Date.now();
     }
 
-    function completeOperation(message, data = null) {
+    function completeOperation(message: string, data: unknown = null) {
         const elapsed = Date.now() - operationTime;
         operationStatus = `${message} (${elapsed}ms)`;
         if (data) {
@@ -94,12 +99,12 @@
         }
     }
 
-    function failOperation(message) {
+    function failOperation(message: string) {
         const elapsed = Date.now() - operationTime;
         operationStatus = `${message} (${elapsed}ms)`;
     }
 
-    function setStatus(message) {
+    function setStatus(message: string) {
         operationStatus = message;
     }
 

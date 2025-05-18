@@ -1,7 +1,6 @@
 import { authState } from '$lib/db/surreal';
-import type { LayoutLoad } from './$types';
 
-export const load: LayoutLoad = async ({ fetch }) => {
+export const load = async () => {
   let user = null;
   
   // Subscribe to authState to get the current user

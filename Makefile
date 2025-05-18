@@ -162,3 +162,5 @@ migrate-departments: start-db check-db-ready
 			echo "Check migration results for details."; \
 		}
 	@echo "✅ Department migration completed"
+
+

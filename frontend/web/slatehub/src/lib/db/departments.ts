@@ -5,7 +5,7 @@ import {
     ConnectionState,
     authState,
 } from "$lib/db/surreal";
-import type { AuthStateValue, AuthUser } from "$lib/db/profile";
+import type { AuthState, AuthUser } from "$lib/db/profile";
 
 // Department type definitions
 export interface Department {

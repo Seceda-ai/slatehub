@@ -303,9 +303,9 @@
                 {/if}
               </td>
               <td>
-                {#if member.joined_at}
+                {#if member.created_at}
                   <span class="joined-date">
-                    {new Date(member.joined_at).toLocaleDateString()}
+                    {new Date(member.created_at).toLocaleDateString()}
                   </span>
                 {/if}
               </td>
