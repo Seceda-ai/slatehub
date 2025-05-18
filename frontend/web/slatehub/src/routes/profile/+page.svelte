@@ -792,18 +792,20 @@
                         </div>
                     {/if}
 
-                    <div class="profile-actions">
-                        <button
-                            class="btn btn-secondary"
-                            on:click={toggleEditMode}>
-                            Cancel
-                        </button>
-                        <button
-                            class="btn btn-outline danger"
-                            on:click={handleSignout}>
-                            Sign Out
-                        </button>
-                    </div>
+                    {#if isEditMode}
+                        <div class="profile-actions">
+                            <button
+                                class="btn btn-secondary"
+                                on:click={toggleEditMode}>
+                                Cancel
+                            </button>
+                            <button
+                                class="btn btn-outline danger"
+                                on:click={handleSignout}>
+                                Sign Out
+                            </button>
+                        </div>
+                    {/if}
             </div>
         </div>
     </div>
