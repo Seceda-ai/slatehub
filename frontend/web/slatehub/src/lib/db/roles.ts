@@ -160,7 +160,7 @@ export async function getPersonRoles(): Promise<PersonRole[]> {
               id AS person_has_role_id,
               out.* AS role
             FROM person_has_role
-            WHERE in = person:yyagy2wpkslowpri3ssl
+            WHERE in = $personId
             FETCH out
     `,
             { personId: userId },
