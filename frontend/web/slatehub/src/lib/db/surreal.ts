@@ -40,7 +40,7 @@ interface DbConfig {
 
 // Default database configuration
 const DEFAULT_CONFIG: DbConfig = {
-  url: import.meta.env.VITE_SURREAL_URL || "http://127.0.0.1:8000/rpc",
+  url: import.meta.env.VITE_SURREAL_URL ? (import.meta.env.VITE_SURREAL_URL.endsWith('/rpc') ? import.meta.env.VITE_SURREAL_URL : `${import.meta.env.VITE_SURREAL_URL}/rpc`) : "http://127.0.0.1:8000/rpc",
   namespace: import.meta.env.VITE_SURREAL_NS || "seceda",
   database: import.meta.env.VITE_SURREAL_DB || "core",
 };
@@ -227,48 +227,57 @@ export async function signin(username: string, password: string) {
       localStorage.setItem("surrealToken", token);
 
       // Get user info and profile data
-        const info = await db.info() || null;
+          const info = await db.info() || null;
       
-        // Fetch additional profile data including images
-        const userId = info && 'id' in info ? info.id : null;
-        try {
-          if (userId) {
-            const profileData = await db.query(`
-              SELECT 
-                username,
-                email,
-                profile_images,
-                profile_image_active
-              FROM ${userId};
-            `);
+          // Fetch additional profile data including images
+          const userId = info && 'id' in info ? info.id : null;
+          try {
+            if (userId) {
+              const profileData = await db.query(`
+                SELECT 
+                  username,
+                  email,
+                  profile_images,
+                  profile_image_active
+                FROM ${userId};
+              `);
           
-            // Extract profile data if available
-            const profile = profileData && Array.isArray(profileData[0]) ? profileData[0][0] : null;
+              // Extract profile data if available - handle potential array nesting
+              let profile = null;
+              if (profileData && Array.isArray(profileData)) {
+                if (profileData.length > 0) {
+                  if (Array.isArray(profileData[0])) {
+                    profile = profileData[0].length > 0 ? profileData[0][0] : null;
+                  } else {
+                    profile = profileData[0];
+                  }
+                }
+              }
           
-            // Combine info with profile data
-            const userData = { 
-              username, 
-              ...info,
-              ...(profile || {})
-            };
+              // Combine info with profile data
+              const userData = { 
+                username, 
+                ...info,
+                ...(profile || {})
+              };
   
-            authState.set({
-              isAuthenticated: true,
-              user: userData,
-              token,
-            });
+              authState.set({
+                isAuthenticated: true,
+                user: userData,
+                token,
+              });
   
-            return { user: userData, token };
-          } else {
-            // Fallback if we can't get the user ID
-            authState.set({
-              isAuthenticated: true,
-              user: { username, ...info },
-              token,
-            });
+              return { user: userData, token };
+            } else {
+              // Fallback if we can't get the user ID
+              authState.set({
+                isAuthenticated: true,
+                user: { username, ...info },
+                token,
+              });
   
-            return { user: { username, ...info }, token };
-          }
+              return { user: { username, ...info }, token };
+            }
         } catch (profileErr) {
           // If fetching profile data fails, still authenticate with basic info
           console.warn("Error fetching profile data:", profileErr);

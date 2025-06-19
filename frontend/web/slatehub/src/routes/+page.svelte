@@ -16,8 +16,12 @@
     onMount(async () => {
         try {
             // Try to connect to the database on page load
-            await connect();
-            connectionError = false;
+            const connected = await connect();
+            connectionError = !connected;
+            
+            if (!connected) {
+                console.error("Failed to connect to SurrealDB");
+            }
         } catch (error) {
             console.error("Connection error:", error);
             connectionError = true;
@@ -63,8 +67,12 @@
             </div>
         {:else if connectionError}
             <div class="connection-error">
-                <p>Unable to connect to the server. Please check your internet connection and try again.</p>
-                <button class="btn btn-primary" on:click={() => window.location.reload()}>Retry</button>
+                <p>Unable to connect to the SurrealDB server. Please check your server configuration and ensure SurrealDB is running.</p>
+                <p class="connection-help">If you're developing locally, make sure SurrealDB is running on {import.meta.env.VITE_SURREAL_URL || "http://localhost:8000"}</p>
+                <div class="connection-actions">
+                    <button class="btn btn-primary" on:click={() => window.location.reload()}>Retry</button>
+                    <a href="/debug" class="btn btn-outline">Debug Connection</a>
+                </div>
             </div>
         {:else if !$authState.isAuthenticated}
             <div class="value-prop">
@@ -327,10 +335,24 @@
     .connection-error {
         background-color: #f8d7da;
         color: #721c24;
-        padding: 1rem;
+        padding: 1.5rem;
         text-align: center;
         border-radius: var(--border-radius-md);
         margin: 1rem 0;
+        border: 1px solid rgba(220, 53, 69, 0.3);
+    }
+    
+    .connection-help {
+        font-size: 0.9rem;
+        margin: 0.75rem 0;
+        color: #666;
+    }
+    
+    .connection-actions {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        margin-top: 1rem;
     }
 
     @media (max-width: 768px) {

@@ -4,6 +4,7 @@
   import AuthGuard from '$lib/components/AuthGuard.svelte';
   import ProductionCard from '$lib/components/productions/ProductionCard.svelte';
   import { getUserProductions, type Production } from '$lib/db/productions';
+  import { connect, getConnectionState, ConnectionState } from '$lib/db/surreal';
 
   // State variables
   let productions: Production[] = [];
@@ -14,6 +15,10 @@
   onMount(async () => {
     try {
       isLoading = true;
+      // Make sure we're connected to SurrealDB
+      if (getConnectionState() !== ConnectionState.CONNECTED) {
+        await connect();
+      }
       productions = await getUserProductions();
     } catch (err: any) {
       error = err.message || 'Failed to load productions';
@@ -40,6 +45,12 @@
     {#if error}
       <div class="alert alert-error">
         <p>{error}</p>
+        {#if error.includes('connect') || error.includes('network') || error.includes('SurrealDB')}
+          <p class="error-help">
+            Make sure your SurrealDB server is running and accessible.
+            <a href="/debug" class="debug-link">Go to Debug Console</a>
+          </p>
+        {/if}
       </div>
     {/if}
 
@@ -95,6 +106,20 @@
     background-color: rgba(220, 53, 69, 0.1);
     color: var(--danger-color);
     border: 1px solid rgba(220, 53, 69, 0.2);
+  }
+  
+  .error-help {
+    font-size: 0.875rem;
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid rgba(220, 53, 69, 0.2);
+  }
+  
+  .debug-link {
+    display: inline-block;
+    margin-top: 0.5rem;
+    color: var(--primary-color);
+    font-weight: 500;
   }
 
   .loading {

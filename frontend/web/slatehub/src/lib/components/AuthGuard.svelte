@@ -11,9 +11,11 @@
   onMount(() => {
     // Check authentication status
     isLoading = false;
-    if (requireAuth && !$authState.isAuthenticated) {
+    
+    // Only redirect if we're not already on the target page
+    if (requireAuth && !$authState.isAuthenticated && window.location.pathname !== redirectTo) {
       goto(redirectTo);
-    } else if (!requireAuth && $authState.isAuthenticated) {
+    } else if (!requireAuth && $authState.isAuthenticated && window.location.pathname !== '/') {
       goto('/'); // Redirect to home if already authenticated
     }
   });

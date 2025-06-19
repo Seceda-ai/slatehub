@@ -1,8 +1,8 @@
 import {
-  db,
-  getConnectionState,
-  connect,
-  ConnectionState,
+    db,
+    getConnectionState,
+    connect,
+    ConnectionState,
 } from "$lib/db/surreal";
 
 // Constants
@@ -13,69 +13,71 @@ const VIEWER_ROLE = "viewer";
 
 // Interfaces
 export interface Organization {
-  id?: string;
-  name: string;
-  slug: string;
-  created_at?: string;
-  updated_at?: string;
+    id?: string;
+    name: string;
+    slug: string;
+    created_at?: string;
+    updated_at?: string;
 }
 
 export interface OrganizationMember {
-  id?: string;
-  in: string; // person id
-  out: string; // organization id
-  role: "owner" | "admin" | "editor" | "viewer";
-  created_at?: string;
-  updated_at?: string;
-  person?: {
-    username: string;
-    email: string;
-  };
+    id?: string;
+    in: string; // person id
+    out: string; // organization id
+    role: "owner" | "admin" | "editor" | "viewer";
+    created_at?: string;
+    updated_at?: string;
+    person?: {
+        username: string;
+        email: string;
+    };
 }
 
 // Get all organizations for the current user
 export async function getUserOrganizations(): Promise<Organization[]> {
-  try {
-    // Ensure we're connected
-    if (getConnectionState() !== ConnectionState.CONNECTED) {
-      await connect();
-    }
+    try {
+        // Ensure we're connected
+        if (getConnectionState() !== ConnectionState.CONNECTED) {
+            await connect();
+        }
 
-    // Get organizations where the user is a member
-    const result = await db.query<[Organization[]]>(`
-      SELECT VALUE array::flatten(->membership->(organization))
+        // Get organizations where the user is a member
+        const result = await db.query<[Organization[]]>(`
+      SELECT VALUE ->membership->(organization)
       FROM $auth.id
       FETCH organization;
     `);
 
-    console.log("Get Orgs: \n", JSON.stringify(result, null, 2));
-    // return result[0][0];
-    return result[0][0] as unknown as Organization[];
-  } catch (error) {
-    console.error("Error fetching user organizations:", error);
-    throw new Error(
-      `Failed to fetch organizations: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
+        console.log("Get Orgs: \n", JSON.stringify(result, null, 2));
+        if (result.length > 0) {
+            return result[0][0];
+        }
+        return [];
+    } catch (error) {
+        console.error("Error fetching user organizations:", error);
+        throw new Error(
+            `Failed to fetch organizations: ${error instanceof Error ? error.message : String(error)}`,
+        );
+    }
 }
 
 // Create a new organization and set current user as owner
 export async function createOrganization(name: string): Promise<Organization> {
-  if (!name || name.trim() === "") {
-    throw new Error("Organization name is required");
-  }
-
-  try {
-    // Ensure we're connected
-    if (getConnectionState() !== ConnectionState.CONNECTED) {
-      await connect();
+    if (!name || name.trim() === "") {
+        throw new Error("Organization name is required");
     }
 
-    // Use a transaction to create both organization and membership
-    const result = await db.query<
-      [{ organization: Organization; membership: any }]
-    >(
-      `
+    try {
+        // Ensure we're connected
+        if (getConnectionState() !== ConnectionState.CONNECTED) {
+            await connect();
+        }
+
+        // Use a transaction to create both organization and membership
+        const result = await db.query<
+            [{ organization: Organization; membership: any }]
+        >(
+            `
       BEGIN TRANSACTION;
 
       // Create the organization
@@ -94,116 +96,120 @@ export async function createOrganization(name: string): Promise<Organization> {
 
       COMMIT TRANSACTION;
     `,
-      { name },
-    );
+            { name },
+        );
 
-    console.log("Org Create: ", result);
-    // Extract the organization from the result
-    if (!result[0]?.organization) {
-      throw new Error("Failed to create organization");
+        console.log("Org Create: ", result);
+        // Extract the organization from the result
+        if (!result[0]?.organization) {
+            throw new Error("Failed to create organization");
+        }
+
+        return result[0].organization;
+    } catch (error) {
+        // Simple error handling
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(`Failed to create organization: ${message}`);
     }
-
-    return result[0].organization;
-  } catch (error) {
-    // Simple error handling
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to create organization: ${message}`);
-  }
 }
 
 // Get organization by slug or ID
 export async function getOrganizationBySlug(
-  slugOrId: string,
+    slugOrId: string,
 ): Promise<Organization | null> {
-  try {
-    // Ensure we're connected
-    if (getConnectionState() !== ConnectionState.CONNECTED) {
-      await connect();
-    }
+    try {
+        // Ensure we're connected
+        if (getConnectionState() !== ConnectionState.CONNECTED) {
+            await connect();
+        }
 
-    // Check if the value looks like an ID (organization:xyz format)
-    const isId = slugOrId.includes(":") || slugOrId.includes("/");
+        // Check if the value looks like an ID (organization:xyz format)
+        const isId = slugOrId.includes(":") || slugOrId.includes("/");
 
-    // Construct the appropriate query based on whether we have an ID or slug
-    const sql = `SELECT * FROM organization
+        // Construct the appropriate query based on whether we have an ID or slug
+        const sql = `SELECT * FROM organization
        WHERE slug = $slug;`;
 
-    // Execute the query
-    const result = await db.query<[Organization[]]>(sql, { slug: slugOrId });
+        // Execute the query
+        const result = await db.query<[Organization[]]>(sql, {
+            slug: slugOrId,
+        });
 
-    // Return the first organization or null if none found
-    if (result[0] && result[0].length > 0) {
-      return result[0][0];
+        // Return the first organization or null if none found
+        if (result[0] && result[0].length > 0) {
+            return result[0][0];
+        }
+
+        return null;
+    } catch (error) {
+        console.error(
+            `Error fetching organization with slug/id '${slugOrId}':`,
+            error,
+        );
+        throw error;
     }
-
-    return null;
-  } catch (error) {
-    console.error(
-      `Error fetching organization with slug/id '${slugOrId}':`,
-      error,
-    );
-    throw error;
-  }
 }
 
 // Update an organization
 export async function updateOrganization(
-  id: string,
-  data: Partial<Organization>,
+    id: string,
+    data: Partial<Organization>,
 ): Promise<Organization> {
-  try {
-    // Ensure we're connected
-    if (getConnectionState() !== ConnectionState.CONNECTED) {
-      await connect();
-    }
+    try {
+        // Ensure we're connected
+        if (getConnectionState() !== ConnectionState.CONNECTED) {
+            await connect();
+        }
 
-    // The schema will auto-generate the slug from the updated name
-    const result = await db.query<[Organization[]]>(
-      `
+        // The schema will auto-generate the slug from the updated name
+        const result = await db.query<[Organization[]]>(
+            `
       UPDATE ${id} CONTENT {
         name: $name,
         updated_at: time::now()
       }
       WHERE id IN (
-        SELECT out FROM member_of_org
+        SELECT out FROM membership
         WHERE in = $auth.id
         AND role IN ["owner", "admin"]
       )
       RETURN *;
     `,
-      { name: data.name },
-    );
+            { name: data.name },
+        );
 
-    // Check if we got a result back
-    if (!result[0] || result[0].length === 0) {
-      throw new Error("Failed to update organization or you lack permission");
+        // Check if we got a result back
+        if (!result[0] || result[0].length === 0) {
+            throw new Error(
+                "Failed to update organization or you lack permission",
+            );
+        }
+
+        return result[0][0];
+    } catch (error) {
+        console.error("Error updating organization:", error);
+        throw error;
     }
-
-    return result[0][0];
-  } catch (error) {
-    console.error("Error updating organization:", error);
-    throw error;
-  }
 }
 
 // Delete an organization
 export async function deleteOrganization(id: string): Promise<boolean> {
-  if (!id) throw new Error("Organization ID is required");
+    if (!id) throw new Error("Organization ID is required");
 
-  try {
-    // Ensure we're connected
-    if (getConnectionState() !== ConnectionState.CONNECTED) {
-      await connect();
-    }
+    try {
+        // Ensure we're connected
+        if (getConnectionState() !== ConnectionState.CONNECTED) {
+            await connect();
+        }
 
-    // Check permission and delete in a single transaction
-    await db.query(
-      `
+        // Check permission and delete in a single transaction
+        await db.query(
+            `
       BEGIN TRANSACTION;
 
       // Check if user is owner
       LET $isOwner = (
-        SELECT * FROM member_of_org
+        SELECT * FROM membership
         WHERE in = $auth.id
         AND out = $id
         AND role = "${OWNER_ROLE}"
@@ -215,38 +221,38 @@ export async function deleteOrganization(id: string): Promise<boolean> {
       END;
 
       // Delete member relationships
-      DELETE member_of_org WHERE out = $id;
+      DELETE membership WHERE out = $id;
 
       // Delete the organization
       DELETE $id;
 
       COMMIT TRANSACTION;
     `,
-      { id },
-    );
+            { id },
+        );
 
-    return true;
-  } catch (error) {
-    console.error("Error deleting organization:", error);
-    throw new Error(
-      `Failed to delete organization: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
+        return true;
+    } catch (error) {
+        console.error("Error deleting organization:", error);
+        throw new Error(
+            `Failed to delete organization: ${error instanceof Error ? error.message : String(error)}`,
+        );
+    }
 }
 
 // Get all members of an organization
 export async function getOrganizationMembers(
-  orgId: string,
+    orgId: string,
 ): Promise<OrganizationMember[]> {
-  try {
-    // Ensure we're connected
-    if (getConnectionState() !== ConnectionState.CONNECTED) {
-      await connect();
-    }
+    try {
+        // Ensure we're connected
+        if (getConnectionState() !== ConnectionState.CONNECTED) {
+            await connect();
+        }
 
-    // Get all members with person details
-    const result = await db.query<[OrganizationMember[]]>(
-      `
+        // Get all members with person details
+        const result = await db.query<[OrganizationMember[]]>(
+            `
       SELECT
         id,
         in,
@@ -254,45 +260,45 @@ export async function getOrganizationMembers(
         role,
         joined_at,
         (SELECT username, email FROM person WHERE id = in) AS person
-      FROM member_of_org
+      FROM membership
       WHERE out = $orgId
     `,
-      { orgId },
-    );
+            { orgId },
+        );
 
-    return result[0] || [];
-  } catch (error) {
-    console.error("Error fetching organization members:", error);
-    throw new Error(
-      `Failed to fetch organization members: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
+        return result[0] || [];
+    } catch (error) {
+        console.error("Error fetching organization members:", error);
+        throw new Error(
+            `Failed to fetch organization members: ${error instanceof Error ? error.message : String(error)}`,
+        );
+    }
 }
 
 // Add a member to an organization
 export async function addOrganizationMember(
-  orgId: string,
-  username: string,
-  role: "admin" | "editor" | "viewer",
+    orgId: string,
+    username: string,
+    role: "admin" | "editor" | "viewer",
 ): Promise<OrganizationMember> {
-  if (!orgId) throw new Error("Organization ID is required");
-  if (!username) throw new Error("Username is required");
-  if (!role) throw new Error("Role is required");
+    if (!orgId) throw new Error("Organization ID is required");
+    if (!username) throw new Error("Username is required");
+    if (!role) throw new Error("Role is required");
 
-  try {
-    // Ensure we're connected
-    if (getConnectionState() !== ConnectionState.CONNECTED) {
-      await connect();
-    }
+    try {
+        // Ensure we're connected
+        if (getConnectionState() !== ConnectionState.CONNECTED) {
+            await connect();
+        }
 
-    // Do everything in a single transaction
-    const result = await db.query<[OrganizationMember[]]>(
-      `
+        // Do everything in a single transaction
+        const result = await db.query<[OrganizationMember[]]>(
+            `
       BEGIN TRANSACTION;
 
       // Check if current user has permission
       LET $hasPermission = (
-        SELECT * FROM member_of_org
+        SELECT * FROM membership
         WHERE in = $auth.id
         AND out = $orgId
         AND role IN ["${OWNER_ROLE}", "${ADMIN_ROLE}"]
@@ -312,7 +318,7 @@ export async function addOrganizationMember(
 
       // Check if already a member
       LET $existing = (
-        SELECT * FROM member_of_org
+        SELECT * FROM membership
         WHERE in = $person.id AND out = $orgId
       )[0];
 
@@ -321,7 +327,7 @@ export async function addOrganizationMember(
       END;
 
       // Add the user as a member
-      LET $member = CREATE member_of_org CONTENT {
+      LET $member = CREATE membership CONTENT {
         in: $person.id,
         out: $orgId,
         role: $role,
@@ -340,59 +346,59 @@ export async function addOrganizationMember(
 
       COMMIT TRANSACTION;
     `,
-      { orgId, username, role },
-    );
+            { orgId, username, role },
+        );
 
-    if (!result[0] || result[0].length === 0) {
-      throw new Error("Failed to add member");
+        if (!result[0] || result[0].length === 0) {
+            throw new Error("Failed to add member");
+        }
+
+        return result[0][0];
+    } catch (error) {
+        console.error("Error adding organization member:", error);
+        throw new Error(
+            `Failed to add member: ${error instanceof Error ? error.message : String(error)}`,
+        );
     }
-
-    return result[0][0];
-  } catch (error) {
-    console.error("Error adding organization member:", error);
-    throw new Error(
-      `Failed to add member: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
 }
 
 // Update a member's role
 export async function updateMemberRole(
-  memberId: string,
-  newRole: "owner" | "admin" | "editor" | "viewer",
+    memberId: string,
+    newRole: "owner" | "admin" | "editor" | "viewer",
 ): Promise<OrganizationMember> {
-  if (!memberId) throw new Error("Member ID is required");
-  if (!newRole) throw new Error("New role is required");
+    if (!memberId) throw new Error("Member ID is required");
+    if (!newRole) throw new Error("New role is required");
 
-  try {
-    // Ensure we're connected
-    if (getConnectionState() !== ConnectionState.CONNECTED) {
-      await connect();
-    }
+    try {
+        // Ensure we're connected
+        if (getConnectionState() !== ConnectionState.CONNECTED) {
+            await connect();
+        }
 
-    // Handle permission checks and update in a single transaction
-    const result = await db.query<[OrganizationMember[]]>(
-      `
-      BEGIN TRANSACTION;
+        // Handle permission checks and update in a single transaction
+        const result = await db.query<[OrganizationMember[]]>(
+            `
+    BEGIN TRANSACTION;
 
-      // Get the membership info
-      LET $membership = (SELECT * FROM ${memberId})[0];
+    // Get the membership info
+    LET $membership = (SELECT * FROM ${memberId})[0];
 
-      // Error if membership not found
-      IF $membership == NONE THEN
-        THROW "Membership not found";
-      END;
+    // Error if membership not found
+    IF $membership == NONE THEN
+      THROW "Membership not found";
+    END;
 
-      // Get the organization ID
-      LET $orgId = $membership.out;
+    // Get the organization ID
+    LET $orgId = $membership.out;
 
-      // Check if current user has permission
-      LET $hasPermission = (
-        SELECT * FROM member_of_org
-        WHERE in = $auth.id
-        AND out = $orgId
-        AND role IN ["${OWNER_ROLE}", "${ADMIN_ROLE}"]
-      )[0];
+    // Check if current user has permission
+    LET $hasPermission = (
+      SELECT * FROM membership
+      WHERE in = $auth.id
+      AND out = $orgId
+      AND role IN ["${OWNER_ROLE}", "${ADMIN_ROLE}"]
+    )[0];
 
       IF $hasPermission == NONE THEN
         THROW "You must be an owner or admin to change member roles";
@@ -401,7 +407,7 @@ export async function updateMemberRole(
       // If changing to owner role, check if current user is owner
       IF $newRole == "${OWNER_ROLE}" THEN
         LET $isOwner = (
-          SELECT * FROM member_of_org
+          SELECT * FROM membership
           WHERE in = $auth.id
           AND out = $orgId
           AND role = "${OWNER_ROLE}"
@@ -426,34 +432,34 @@ export async function updateMemberRole(
 
       COMMIT TRANSACTION;
     `,
-      { newRole },
-    );
+            { newRole },
+        );
 
-    if (!result[0] || result[0].length === 0) {
-      throw new Error("Failed to update member role");
+        if (!result[0] || result[0].length === 0) {
+            throw new Error("Failed to update member role");
+        }
+
+        return result[0][0];
+    } catch (error) {
+        console.error("Error updating member role:", error);
+        throw new Error(
+            `Failed to update member role: ${error instanceof Error ? error.message : String(error)}`,
+        );
     }
-
-    return result[0][0];
-  } catch (error) {
-    console.error("Error updating member role:", error);
-    throw new Error(
-      `Failed to update member role: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
 }
 
 // Remove a member from an organization
 export async function removeMember(memberId: string): Promise<boolean> {
-  if (!memberId) throw new Error("Member ID is required");
+    if (!memberId) throw new Error("Member ID is required");
 
-  try {
-    // Ensure we're connected
-    if (getConnectionState() !== ConnectionState.CONNECTED) {
-      await connect();
-    }
+    try {
+        // Ensure we're connected
+        if (getConnectionState() !== ConnectionState.CONNECTED) {
+            await connect();
+        }
 
-    // Perform permission checks and deletion in a single transaction
-    await db.query(`
+        // Perform permission checks and deletion in a single transaction
+        await db.query(`
       BEGIN TRANSACTION;
 
       // Get membership information
@@ -470,7 +476,7 @@ export async function removeMember(memberId: string): Promise<boolean> {
 
       // Check if current user has permission
       LET $hasPermission = (
-        SELECT * FROM member_of_org
+        SELECT * FROM membership
         WHERE in = $auth.id
         AND out = $orgId
         AND role IN ["${OWNER_ROLE}", "${ADMIN_ROLE}"]
@@ -483,7 +489,7 @@ export async function removeMember(memberId: string): Promise<boolean> {
       // If removing an owner, check if current user is also an owner
       IF $memberRole == "${OWNER_ROLE}" THEN
         LET $isOwner = (
-          SELECT * FROM member_of_org
+          SELECT * FROM membership
           WHERE in = $auth.id
           AND out = $orgId
           AND role = "${OWNER_ROLE}"
@@ -508,11 +514,11 @@ export async function removeMember(memberId: string): Promise<boolean> {
       COMMIT TRANSACTION;
     `);
 
-    return true;
-  } catch (error) {
-    console.error("Error removing organization member:", error);
-    throw new Error(
-      `Failed to remove member: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
+        return true;
+    } catch (error) {
+        console.error("Error removing organization member:", error);
+        throw new Error(
+            `Failed to remove member: ${error instanceof Error ? error.message : String(error)}`,
+        );
+    }
 }

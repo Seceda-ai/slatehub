@@ -38,8 +38,8 @@ clean:
 init-env:
 	@if [ ! -f .env ]; then \
 		echo "→ Creating .env from template…"; \
-		cp ../.env-example .env; \
-		echo "VITE_SURREAL_URL=http://localhost:8000" >> .env; \
+		cp .env-example .env; \
+		echo "VITE_SURREAL_URL=http://localhost:8000/rpc" >> .env; \
 		echo "VITE_SURREAL_NS=$${SURREAL_NS:-seceda}" >> .env; \
 		echo "VITE_SURREAL_DB=$${SURREAL_DB:-core}" >> .env; \
 	else \
@@ -48,3 +48,6 @@ init-env:
 
 # Full development setup
 setup: init-env install dev
+
+# Clean and rebuild dev environment
+rebuild: clean init-env install dev
