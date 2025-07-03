@@ -3,20 +3,34 @@
     import { authState, signout } from "$lib/db/surreal";
     import { goto } from "$app/navigation";
     import { onMount } from "svelte";
-    import { getProfile, updateProfile, updateCredentials, type ProfileUpdateData, type CredentialsUpdateData } from "$lib/db/profile";
+    import {
+        getProfile,
+        updateProfile,
+        updateCredentials,
+        type ProfileUpdateData,
+        type CredentialsUpdateData,
+    } from "$lib/db/profile";
     import {
         getAllRoles,
         getPersonRoles,
         addRoleToPerson,
         removeRoleFromPerson,
         type Role,
-        type PersonRole
-    } from '$lib/db/roles';
+        type PersonRole,
+    } from "$lib/db/roles";
+    import {
+        addEmail,
+        removeEmail,
+        setPrimaryEmail,
+        validateEmail,
+        getPrimaryEmail,
+        type Email,
+    } from "$lib/db/profile";
 
     // Active tab for profile sections
-    type TabType = 'account' | 'personal' | 'social' | 'roles';
-    let activeTab: TabType = 'account';
-    
+    type TabType = "account" | "personal" | "social" | "roles" | "emails";
+    let activeTab: TabType = "account";
+
     // View mode or edit mode
     let isEditMode = false;
 
@@ -28,22 +42,22 @@
     let profileUpdateError: string | null = null;
 
     // Account details form fields
-    let username = '';
-    let currentPassword = '';
-    let newPassword = '';
-    let confirmPassword = '';
+    let username = "";
+    let currentPassword = "";
+    let newPassword = "";
+    let confirmPassword = "";
     let accountError: string | null = null;
     let isUpdatingCredentials = false;
 
     // Personal info form fields
-    let fullName = '';
-    let location = '';
-    let countryCode = '';
-    let phoneNumber = '';
-    
+    let fullName = "";
+    let location = "";
+    let countryCode = "";
+    let phoneNumber = "";
+
     // Social media form fields
-    let discordHandle = '';
-    let instagramHandle = '';
+    let discordHandle = "";
+    let instagramHandle = "";
 
     // Country codes data for dropdown
     const countryCodes = [
@@ -71,7 +85,7 @@
         { code: "+48", country: "Poland" },
         { code: "+420", country: "Czech Republic" },
         { code: "+36", country: "Hungary" },
-        { code: "+43", country: "Austria" }
+        { code: "+43", country: "Austria" },
     ];
 
     // Roles state
@@ -85,19 +99,23 @@
     let roleSearchTerm: string = "";
     let filteredRoles: Role[] = [];
 
+    // Email management state
+    let newEmail: string = "";
+    let emailError: string | null = null;
+    let isAddingEmail = false;
+    let showAddEmailForm = false;
+    let makePrimary = false;
+    let isSettingPrimary = false;
+
     onMount(async () => {
-        await Promise.all([
-            loadProfile(),
-            loadUserRoles(),
-            loadAllRoles()
-        ]);
+        await Promise.all([loadProfile(), loadUserRoles(), loadAllRoles()]);
     });
-    
+
     // Change active tab
     function setActiveTab(tab: TabType) {
         activeTab = tab;
     }
-    
+
     // Toggle between view mode and edit mode
     function toggleEditMode() {
         isEditMode = !isEditMode;
@@ -106,25 +124,25 @@
             resetFormValues();
         }
     }
-    
+
     // Reset form values to match profile data
     function resetFormValues() {
         if (profile) {
             // Account fields
-            username = profile.username || '';
-            currentPassword = '';
-            newPassword = '';
-            confirmPassword = '';
-            
+            username = profile.username || "";
+            currentPassword = "";
+            newPassword = "";
+            confirmPassword = "";
+
             // Personal info fields
-            fullName = profile.full_name || '';
-            location = profile.location || '';
-            countryCode = profile.phone?.country_code || '';
-            phoneNumber = profile.phone?.number || '';
-            
+            fullName = profile.full_name || "";
+            location = profile.location || "";
+            countryCode = profile.phone?.country_code || "";
+            phoneNumber = profile.phone?.number || "";
+
             // Social fields
-            discordHandle = profile.social?.discord || '';
-            instagramHandle = profile.social?.instagram || '';
+            discordHandle = profile.social?.discord || "";
+            instagramHandle = profile.social?.instagram || "";
         }
     }
 
@@ -133,21 +151,21 @@
             isLoading = true;
             error = null;
             profile = await getProfile();
-            
+
             // Initialize form fields with profile data
             if (profile) {
                 // Set account fields
-                username = profile.username || '';
-                
+                username = profile.username || "";
+
                 // Set personal info fields
-                fullName = profile.full_name || '';
-                location = profile.location || '';
-                countryCode = profile.phone?.country_code || '';
-                phoneNumber = profile.phone?.number || '';
-                
+                fullName = profile.full_name || "";
+                location = profile.location || "";
+                countryCode = profile.phone?.country_code || "";
+                phoneNumber = profile.phone?.number || "";
+
                 // Set social fields
-                discordHandle = profile.social?.discord || '';
-                instagramHandle = profile.social?.instagram || '';
+                discordHandle = profile.social?.discord || "";
+                instagramHandle = profile.social?.instagram || "";
             }
         } catch (err: unknown) {
             const errorMsg =
@@ -253,7 +271,7 @@
     // Format roles as a comma-separated list
     function getRolesList(roles: PersonRole[]): string {
         if (!roles || roles.length === 0) return "No roles added yet";
-        return roles.map(role => role.role.name).join(", ");
+        return roles.map((role) => role.role.name).join(", ");
     }
 
     // Save personal info
@@ -267,21 +285,22 @@
                 location: location,
                 phone: {
                     country_code: countryCode,
-                    number: phoneNumber
-                }
+                    number: phoneNumber,
+                },
             };
 
             profile = await updateProfile(profileData);
         } catch (err: unknown) {
-            profileUpdateError = err instanceof Error 
-                ? err.message 
-                : "Failed to update personal information";
+            profileUpdateError =
+                err instanceof Error
+                    ? err.message
+                    : "Failed to update personal information";
             console.error("Error updating profile:", err);
         } finally {
             isSavingProfile = false;
         }
     }
-    
+
     // Save social media info
     async function saveSocialInfo() {
         try {
@@ -291,75 +310,136 @@
             const profileData: ProfileUpdateData = {
                 social: {
                     discord: discordHandle,
-                    instagram: instagramHandle
-                }
+                    instagram: instagramHandle,
+                },
             };
 
             profile = await updateProfile(profileData);
         } catch (err: unknown) {
-            profileUpdateError = err instanceof Error 
-                ? err.message 
-                : "Failed to update social media information";
+            profileUpdateError =
+                err instanceof Error
+                    ? err.message
+                    : "Failed to update social media information";
             console.error("Error updating social info:", err);
         } finally {
             isSavingProfile = false;
         }
     }
-    
+
     // Update account credentials
     async function updateAccountCredentials() {
         try {
             accountError = null;
             isUpdatingCredentials = true;
-            
+
             // Validate passwords match if changing password
             if (newPassword && newPassword !== confirmPassword) {
                 accountError = "New passwords do not match";
                 return;
             }
-            
+
             // Validate current password is provided
             if (!currentPassword) {
                 accountError = "Current password is required";
                 return;
             }
-            
+
             const credentialsData: CredentialsUpdateData = {
-                currentPassword
+                currentPassword,
             };
-            
+
             // Only include username/password if they're being changed
             if (username !== profile.username) {
                 credentialsData.username = username;
             }
-            
+
             if (newPassword) {
                 credentialsData.newPassword = newPassword;
             }
-            
+
             // If nothing is being changed, show message
             if (!credentialsData.username && !credentialsData.newPassword) {
                 accountError = "No changes to save";
                 return;
             }
-            
+
             profile = await updateCredentials(credentialsData);
-            
+
             // Clear form fields after successful update
-            currentPassword = '';
-            newPassword = '';
-            confirmPassword = '';
-            
+            currentPassword = "";
+            newPassword = "";
+            confirmPassword = "";
+
             // Show success message
             accountError = "✓ Account updated successfully";
-            
         } catch (err: unknown) {
-            accountError = err instanceof Error 
-                ? err.message 
-                : "Failed to update credentials";
+            accountError =
+                err instanceof Error
+                    ? err.message
+                    : "Failed to update credentials";
             console.error("Error updating credentials:", err);
         } finally {
             isUpdatingCredentials = false;
+        }
+    }
+
+    // Add email
+    async function handleAddEmail() {
+        if (!newEmail) {
+            emailError = "Please enter an email address";
+            return;
+        }
+
+        if (!validateEmail(newEmail)) {
+            emailError = "Please enter a valid email address";
+            return;
+        }
+
+        try {
+            isAddingEmail = true;
+            emailError = null;
+            profile = await addEmail(newEmail, makePrimary);
+            newEmail = "";
+            makePrimary = false;
+            showAddEmailForm = false;
+        } catch (err: unknown) {
+            emailError =
+                err instanceof Error ? err.message : "Failed to add email";
+            console.error("Error adding email:", err);
+        } finally {
+            isAddingEmail = false;
+        }
+    }
+
+    // Remove email
+    async function handleRemoveEmail(email: string) {
+        if (!confirm(`Are you sure you want to remove ${email}?`)) {
+            return;
+        }
+
+        try {
+            profile = await removeEmail(email);
+        } catch (err: unknown) {
+            emailError =
+                err instanceof Error ? err.message : "Failed to remove email";
+            console.error("Error removing email:", err);
+        }
+    }
+
+    // Set primary email
+    async function handleSetPrimaryEmail(email: string) {
+        try {
+            isSettingPrimary = true;
+            emailError = null;
+            profile = await setPrimaryEmail(email);
+        } catch (err: unknown) {
+            emailError =
+                err instanceof Error
+                    ? err.message
+                    : "Failed to set primary email";
+            console.error("Error setting primary email:", err);
+        } finally {
+            isSettingPrimary = false;
         }
     }
 </script>
@@ -379,29 +459,45 @@
             {#if isEditMode}
                 <!-- Tab navigation for edit mode -->
                 <div class="profile-tabs">
-                    <button 
-                        class="tab-button {activeTab === 'account' ? 'active' : ''}" 
-                        on:click={() => setActiveTab('account')}
+                    <button
+                        class="tab-button {activeTab === 'account'
+                            ? 'active'
+                            : ''}"
+                        on:click={() => setActiveTab("account")}
                     >
                         Account
                     </button>
-                    <button 
-                        class="tab-button {activeTab === 'personal' ? 'active' : ''}"
-                        on:click={() => setActiveTab('personal')}
+                    <button
+                        class="tab-button {activeTab === 'personal'
+                            ? 'active'
+                            : ''}"
+                        on:click={() => setActiveTab("personal")}
                     >
                         Personal Info
                     </button>
-                    <button 
-                        class="tab-button {activeTab === 'social' ? 'active' : ''}"
-                        on:click={() => setActiveTab('social')}
+                    <button
+                        class="tab-button {activeTab === 'social'
+                            ? 'active'
+                            : ''}"
+                        on:click={() => setActiveTab("social")}
                     >
                         Social Media
                     </button>
-                    <button 
-                        class="tab-button {activeTab === 'roles' ? 'active' : ''}"
-                        on:click={() => setActiveTab('roles')}
+                    <button
+                        class="tab-button {activeTab === 'roles'
+                            ? 'active'
+                            : ''}"
+                        on:click={() => setActiveTab("roles")}
                     >
                         Production Roles
+                    </button>
+                    <button
+                        class="tab-button {activeTab === 'emails'
+                            ? 'active'
+                            : ''}"
+                        on:click={() => setActiveTab("emails")}
+                    >
+                        Email Addresses
                     </button>
                 </div>
             {/if}
@@ -414,36 +510,61 @@
                             <h3 class="section-title">Account Information</h3>
                             <div class="profile-field">
                                 <span class="field-label">Username</span>
-                                <span class="field-value">{profile?.username || "Not available"}</span>
+                                <span class="field-value"
+                                    >{profile?.username ||
+                                        "Not available"}</span
+                                >
                             </div>
                             <div class="profile-field">
-                                <span class="field-label">Email</span>
-                                <span class="field-value">{profile?.email || "Not available"}</span>
+                                <span class="field-label">Primary Email</span>
+                                <span class="field-value"
+                                    >{getPrimaryEmail(profile) ||
+                                        "Not available"}</span
+                                >
                             </div>
+                            {#if profile?.emails && profile.emails.filter((e) => !e.is_primary).length > 0}
+                                <div class="profile-field">
+                                    <span class="field-label"
+                                        >Additional Emails</span
+                                    >
+                                    <div class="additional-emails-list">
+                                        {#each profile.emails.filter((e) => !e.is_primary) as email}
+                                            <span class="field-value"
+                                                >{email.address}</span
+                                            >
+                                        {/each}
+                                    </div>
+                                </div>
+                            {/if}
                         </div>
-                        
+
                         <div class="section">
                             <h3 class="section-title">Personal Information</h3>
                             <div class="profile-field">
                                 <span class="field-label">Full Name</span>
-                                <span class="field-value">{profile?.full_name || "Not set"}</span>
+                                <span class="field-value"
+                                    >{profile?.full_name || "Not set"}</span
+                                >
                             </div>
                             <div class="profile-field">
                                 <span class="field-label">Location</span>
-                                <span class="field-value">{profile?.location || "Not set"}</span>
+                                <span class="field-value"
+                                    >{profile?.location || "Not set"}</span
+                                >
                             </div>
                             <div class="profile-field">
                                 <span class="field-label">Phone Number</span>
                                 <span class="field-value">
                                     {#if profile?.phone?.country_code && profile?.phone?.number}
-                                        {profile.phone.country_code} {profile.phone.number}
+                                        {profile.phone.country_code}
+                                        {profile.phone.number}
                                     {:else}
                                         Not set
                                     {/if}
                                 </span>
                             </div>
                         </div>
-                        
+
                         <div class="section">
                             <h3 class="section-title">Social Media</h3>
                             <div class="profile-field">
@@ -467,345 +588,551 @@
                                 </span>
                             </div>
                         </div>
-                        
+
                         <div class="section">
                             <h3 class="section-title">Production Roles</h3>
-                            <div class="roles-summary" class:empty={userRoles.length === 0}>
+                            <div
+                                class="roles-summary"
+                                class:empty={userRoles.length === 0}
+                            >
                                 {getRolesList(userRoles)}
                             </div>
                         </div>
-                        
+
                         <div class="profile-actions">
-                            <button class="btn btn-primary" on:click={toggleEditMode}>
+                            <button
+                                class="btn btn-primary"
+                                on:click={toggleEditMode}
+                            >
                                 Edit Profile
                             </button>
-                            <button class="btn btn-outline danger" on:click={handleSignout}>
+                            <button
+                                class="btn btn-outline danger"
+                                on:click={handleSignout}
+                            >
                                 Sign Out
                             </button>
                         </div>
                     </div>
-                {:else if activeTab === 'account'}
+                {:else if activeTab === "account"}
                     <div class="tab-content">
                         <h3 class="section-title">Account Credentials</h3>
-                        
+
                         {#if accountError}
-                            <div class="alert {accountError.includes('✓') ? 'alert-success' : 'alert-error'}">
+                            <div
+                                class="alert {accountError.includes('✓')
+                                    ? 'alert-success'
+                                    : 'alert-error'}"
+                            >
                                 {accountError}
                             </div>
                         {/if}
-                        
+
                         <div class="form-section">
                             <div class="profile-field">
-                                <label for="username" class="field-label">Username</label>
-                                <input 
-                                    type="text" 
-                                    id="username" 
-                                    class="form-input" 
-                                    bind:value={username} 
+                                <label for="username" class="field-label"
+                                    >Username</label
+                                >
+                                <input
+                                    type="text"
+                                    id="username"
+                                    class="form-input"
+                                    bind:value={username}
                                     placeholder="Enter username"
                                 />
-                                <span class="field-hint">Username must be at least 3 characters and contain only letters, numbers, hyphens and underscores</span>
+                                <span class="field-hint"
+                                    >Username must be at least 3 characters and
+                                    contain only letters, numbers, hyphens and
+                                    underscores</span
+                                >
                             </div>
-                            
+
                             <div class="profile-field">
-                                <label for="current-password" class="field-label">Current Password <span class="required">*</span></label>
-                                <input 
-                                    type="password" 
-                                    id="current-password" 
-                                    class="form-input" 
-                                    bind:value={currentPassword} 
+                                <label
+                                    for="current-password"
+                                    class="field-label"
+                                    >Current Password <span class="required"
+                                        >*</span
+                                    ></label
+                                >
+                                <input
+                                    type="password"
+                                    id="current-password"
+                                    class="form-input"
+                                    bind:value={currentPassword}
                                     placeholder="Enter current password"
                                 />
-                                <span class="field-hint">Required to make any changes</span>
+                                <span class="field-hint"
+                                    >Required to make any changes</span
+                                >
                             </div>
-                            
+
                             <div class="profile-field">
-                                <label for="new-password" class="field-label">New Password</label>
-                                <input 
-                                    type="password" 
-                                    id="new-password" 
-                                    class="form-input" 
-                                    bind:value={newPassword} 
+                                <label for="new-password" class="field-label"
+                                    >New Password</label
+                                >
+                                <input
+                                    type="password"
+                                    id="new-password"
+                                    class="form-input"
+                                    bind:value={newPassword}
                                     placeholder="Enter new password"
                                 />
-                                <span class="field-hint">Leave blank to keep current password</span>
+                                <span class="field-hint"
+                                    >Leave blank to keep current password</span
+                                >
                             </div>
-                            
+
                             <div class="profile-field">
-                                <label for="confirm-password" class="field-label">Confirm New Password</label>
-                                <input 
-                                    type="password" 
-                                    id="confirm-password" 
-                                    class="form-input" 
-                                    bind:value={confirmPassword} 
+                                <label
+                                    for="confirm-password"
+                                    class="field-label"
+                                    >Confirm New Password</label
+                                >
+                                <input
+                                    type="password"
+                                    id="confirm-password"
+                                    class="form-input"
+                                    bind:value={confirmPassword}
                                     placeholder="Confirm new password"
                                 />
                             </div>
                         </div>
-                        
+
                         <div class="form-actions">
-                            <button 
-                                class="btn btn-primary" 
+                            <button
+                                class="btn btn-primary"
                                 on:click={updateAccountCredentials}
                                 disabled={isUpdatingCredentials}
                             >
-                                {isUpdatingCredentials ? 'Updating...' : 'Update Account'}
+                                {isUpdatingCredentials
+                                    ? "Updating..."
+                                    : "Update Account"}
                             </button>
                         </div>
                     </div>
-                {:else if activeTab === 'personal'}
-                        <div class="tab-content">
-                            {#if profileUpdateError}
-                                <div class="alert alert-error">
-                                    {profileUpdateError}
-                                </div>
-                            {/if}
+                {:else if activeTab === "personal"}
+                    <div class="tab-content">
+                        {#if profileUpdateError}
+                            <div class="alert alert-error">
+                                {profileUpdateError}
+                            </div>
+                        {/if}
 
-                            <div class="form-section">
-                                <h3 class="section-title">Personal Information</h3>
-                            
-                                <div class="profile-field">
-                                    <span class="field-label">Email</span>
-                                    <span class="field-value">{$authState.user?.email || "Not available"}</span>
-                                    <span class="field-hint">(Cannot be changed)</span>
-                                </div>
+                        <div class="form-section">
+                            <h3 class="section-title">Personal Information</h3>
 
-                                <div class="profile-field">
-                                    <label for="fullName" class="field-label">Full Name</label>
-                                    <input 
-                                        type="text" 
-                                        id="fullName" 
-                                        class="form-input" 
-                                        bind:value={fullName} 
-                                        placeholder="Enter your full name"
+                            <div class="profile-field">
+                                <span class="field-label">Primary Email</span>
+                                <span class="field-value"
+                                    >{getPrimaryEmail(profile) ||
+                                        "Not available"}</span
+                                >
+                                <span class="field-hint"
+                                    >(Manage emails in the Email Addresses tab)</span
+                                >
+                            </div>
+
+                            <div class="profile-field">
+                                <label for="fullName" class="field-label"
+                                    >Full Name</label
+                                >
+                                <input
+                                    type="text"
+                                    id="fullName"
+                                    class="form-input"
+                                    bind:value={fullName}
+                                    placeholder="Enter your full name"
+                                />
+                            </div>
+
+                            <div class="profile-field">
+                                <label for="location" class="field-label"
+                                    >Location</label
+                                >
+                                <input
+                                    type="text"
+                                    id="location"
+                                    class="form-input"
+                                    bind:value={location}
+                                    placeholder="City, Country"
+                                />
+                            </div>
+
+                            <div class="profile-field phone-field">
+                                <label for="phone" class="field-label"
+                                    >Phone Number</label
+                                >
+                                <div class="phone-input-group">
+                                    <select
+                                        id="countryCode"
+                                        class="country-code-select"
+                                        bind:value={countryCode}
+                                    >
+                                        <option value="">Select Code</option>
+                                        {#each countryCodes as country}
+                                            <option value={country.code}
+                                                >{country.code} ({country.country})</option
+                                            >
+                                        {/each}
+                                    </select>
+                                    <input
+                                        type="tel"
+                                        id="phone"
+                                        class="phone-input"
+                                        bind:value={phoneNumber}
+                                        placeholder="Phone number"
                                     />
                                 </div>
+                            </div>
+                        </div>
 
-                                <div class="profile-field">
-                                    <label for="location" class="field-label">Location</label>
-                                    <input 
-                                        type="text" 
-                                        id="location" 
-                                        class="form-input" 
-                                        bind:value={location} 
-                                        placeholder="City, Country"
+                        <div class="form-actions">
+                            <button
+                                class="btn btn-primary"
+                                on:click={savePersonalInfo}
+                                disabled={isSavingProfile}
+                            >
+                                {isSavingProfile
+                                    ? "Saving..."
+                                    : "Save Personal Info"}
+                            </button>
+                        </div>
+                    </div>
+                {:else if activeTab === "social"}
+                    <div class="tab-content">
+                        {#if profileUpdateError}
+                            <div class="alert alert-error">
+                                {profileUpdateError}
+                            </div>
+                        {/if}
+
+                        <div class="form-section">
+                            <h3 class="section-title">Social Media</h3>
+
+                            <div class="profile-field">
+                                <label for="discord" class="field-label"
+                                    >Discord</label
+                                >
+                                <div class="social-input-group">
+                                    <span class="social-prefix">@</span>
+                                    <input
+                                        type="text"
+                                        id="discord"
+                                        class="social-input"
+                                        bind:value={discordHandle}
+                                        placeholder="Discord username"
                                     />
                                 </div>
-                            
-                                <div class="profile-field phone-field">
-                                    <label for="phone" class="field-label">Phone Number</label>
-                                    <div class="phone-input-group">
-                                        <select 
-                                            id="countryCode" 
-                                            class="country-code-select" 
-                                            bind:value={countryCode}
+                            </div>
+
+                            <div class="profile-field">
+                                <label for="instagram" class="field-label"
+                                    >Instagram</label
+                                >
+                                <div class="social-input-group">
+                                    <span class="social-prefix">@</span>
+                                    <input
+                                        type="text"
+                                        id="instagram"
+                                        class="social-input"
+                                        bind:value={instagramHandle}
+                                        placeholder="Instagram handle"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <button
+                                class="btn btn-primary"
+                                on:click={saveSocialInfo}
+                                disabled={isSavingProfile}
+                            >
+                                {isSavingProfile
+                                    ? "Saving..."
+                                    : "Save Social Info"}
+                            </button>
+                        </div>
+                    </div>
+                {:else if activeTab === "roles"}
+                    <div class="tab-content">
+                        <div class="roles-header">
+                            <button
+                                class="btn btn-sm btn-primary"
+                                on:click={() =>
+                                    (showRoleSelector = !showRoleSelector)}
+                            >
+                                {showRoleSelector ? "Cancel" : "Add Role"}
+                            </button>
+                        </div>
+
+                        {#if isLoadingRoles}
+                            <p>Loading roles...</p>
+                        {:else if rolesError}
+                            <p class="error-message">{rolesError}</p>
+                        {:else}
+                            <!-- Show roles as comma-separated list -->
+                            <div
+                                class="roles-summary"
+                                class:empty={userRoles.length === 0}
+                            >
+                                {getRolesList(userRoles)}
+                            </div>
+
+                            {#if showRoleSelector}
+                                <div class="role-selector">
+                                    <div class="form-group">
+                                        <label for="role-search"
+                                            >Search Available Roles</label
                                         >
-                                            <option value="">Select Code</option>
-                                            {#each countryCodes as country}
-                                                <option value={country.code}>{country.code} ({country.country})</option>
+                                        <input
+                                            type="text"
+                                            id="role-search"
+                                            placeholder="Type to search roles..."
+                                            bind:value={roleSearchTerm}
+                                            on:input={filterRoles}
+                                            disabled={isAddingRole}
+                                        />
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="role">Select a Role</label>
+                                        <select
+                                            id="role"
+                                            bind:value={selectedRoleId}
+                                            disabled={isAddingRole ||
+                                                filteredRoles.length === 0}
+                                            size="5"
+                                            class="role-select"
+                                        >
+                                            {#each filteredRoles as role}
+                                                <option value={role.id}
+                                                    >{role.name}</option
+                                                >
                                             {/each}
                                         </select>
-                                        <input 
-                                            type="tel" 
-                                            id="phone" 
-                                            class="phone-input" 
-                                            bind:value={phoneNumber} 
-                                            placeholder="Phone number"
-                                        />
+                                        {#if filteredRoles.length === 0}
+                                            <p class="no-roles-found">
+                                                No roles found. Try another
+                                                search term.
+                                            </p>
+                                        {/if}
                                     </div>
-                                </div>
-                            </div>
 
-                            <div class="form-actions">
-                                <button 
-                                    class="btn btn-primary" 
-                                    on:click={savePersonalInfo}
-                                    disabled={isSavingProfile}
-                                >
-                                    {isSavingProfile ? 'Saving...' : 'Save Personal Info'}
-                                </button>
-                            </div>
-                        </div>
-                    {:else if activeTab === 'social'}
-                        <div class="tab-content">
-                            {#if profileUpdateError}
-                                <div class="alert alert-error">
-                                    {profileUpdateError}
+                                    <div class="role-details">
+                                        {#if selectedRoleId}
+                                            {#each filteredRoles.filter((r) => r.id === selectedRoleId) as selectedRole}
+                                                <div class="selected-role-info">
+                                                    <h4>{selectedRole.name}</h4>
+                                                    {#if selectedRole.description}
+                                                        <p>
+                                                            {selectedRole.description}
+                                                        </p>
+                                                    {/if}
+                                                </div>
+                                            {/each}
+                                        {/if}
+                                    </div>
+
+                                    <div class="action-buttons">
+                                        <button
+                                            class="btn btn-secondary"
+                                            on:click={() =>
+                                                (showRoleSelector = false)}
+                                            disabled={isAddingRole}
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            class="btn btn-primary"
+                                            on:click={handleAddRole}
+                                            disabled={isAddingRole ||
+                                                !selectedRoleId}
+                                        >
+                                            {isAddingRole
+                                                ? "Adding..."
+                                                : "Add Role"}
+                                        </button>
+                                    </div>
                                 </div>
                             {/if}
 
-                            <div class="form-section">
-                                <h3 class="section-title">Social Media</h3>
-                            
-                                <div class="profile-field">
-                                    <label for="discord" class="field-label">Discord</label>
-                                    <div class="social-input-group">
-                                        <span class="social-prefix">@</span>
-                                        <input 
-                                            type="text" 
-                                            id="discord" 
-                                            class="social-input" 
-                                            bind:value={discordHandle} 
-                                            placeholder="Discord username"
-                                        />
-                                    </div>
+                            {#if userRoles.length > 0}
+                                <h3 class="section-title">Manage Your Roles</h3>
+                                <div class="roles-list">
+                                    {#each userRoles as personRole}
+                                        <div class="role-card">
+                                            <div class="role-info">
+                                                <span class="role-title">
+                                                    {personRole.role.name}
+                                                </span>
+                                            </div>
+                                            <button
+                                                class="btn btn-sm btn-danger"
+                                                on:click={() =>
+                                                    handleRemoveRole(
+                                                        personRole.person_has_role_id,
+                                                    )}
+                                                title="Remove this role"
+                                            >
+                                                ✕
+                                            </button>
+                                        </div>
+                                    {/each}
                                 </div>
+                            {/if}
+                        {/if}
+                    </div>
+                {:else if activeTab === "emails"}
+                    <div class="tab-content">
+                        <h3 class="section-title">Email Addresses</h3>
 
-                                <div class="profile-field">
-                                    <label for="instagram" class="field-label">Instagram</label>
-                                    <div class="social-input-group">
-                                        <span class="social-prefix">@</span>
-                                        <input 
-                                            type="text" 
-                                            id="instagram" 
-                                            class="social-input" 
-                                            bind:value={instagramHandle} 
-                                            placeholder="Instagram handle"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="form-actions">
-                                <button 
-                                    class="btn btn-primary" 
-                                    on:click={saveSocialInfo}
-                                    disabled={isSavingProfile}
-                                >
-                                    {isSavingProfile ? 'Saving...' : 'Save Social Info'}
-                                </button>
-                            </div>
-                        </div>
-                    {:else if activeTab === 'roles'}
-                        <div class="tab-content">
-                            <div class="roles-header">
+                        <div class="email-management">
+                            <div class="section-header">
+                                <h4>Email Addresses</h4>
                                 <button
                                     class="btn btn-sm btn-primary"
-                                    on:click={() => (showRoleSelector = !showRoleSelector)}
+                                    on:click={() =>
+                                        (showAddEmailForm = !showAddEmailForm)}
+                                    disabled={isAddingEmail}
                                 >
-                                    {showRoleSelector ? "Cancel" : "Add Role"}
+                                    {showAddEmailForm ? "Cancel" : "Add Email"}
                                 </button>
                             </div>
 
-                            {#if isLoadingRoles}
-                                <p>Loading roles...</p>
-                            {:else if rolesError}
-                                <p class="error-message">{rolesError}</p>
-                            {:else}
-                                <!-- Show roles as comma-separated list -->
-                                <div class="roles-summary" class:empty={userRoles.length === 0}>
-                                    {getRolesList(userRoles)}
+                            {#if emailError}
+                                <div class="alert alert-error">
+                                    {emailError}
                                 </div>
+                            {/if}
 
-                                {#if showRoleSelector}
-                                    <div class="role-selector">
-                                        <div class="form-group">
-                                            <label for="role-search">Search Available Roles</label>
+                            {#if showAddEmailForm}
+                                <div class="add-email-form">
+                                    <div class="form-group">
+                                        <label for="new-email"
+                                            >New Email Address</label
+                                        >
+                                        <input
+                                            type="email"
+                                            id="new-email"
+                                            class="form-input"
+                                            bind:value={newEmail}
+                                            placeholder="Enter email address"
+                                            disabled={isAddingEmail}
+                                        />
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="checkbox-label">
                                             <input
-                                                type="text"
-                                                id="role-search"
-                                                placeholder="Type to search roles..."
-                                                bind:value={roleSearchTerm}
-                                                on:input={filterRoles}
-                                                disabled={isAddingRole}
+                                                type="checkbox"
+                                                bind:checked={makePrimary}
+                                                disabled={isAddingEmail}
                                             />
-                                        </div>
-
-                                        <div class="form-group">
-                                            <label for="role">Select a Role</label>
-                                            <select
-                                                id="role"
-                                                bind:value={selectedRoleId}
-                                                disabled={isAddingRole ||
-                                                    filteredRoles.length === 0}
-                                                size="5"
-                                                class="role-select"
-                                            >
-                                                {#each filteredRoles as role}
-                                                    <option value={role.id}
-                                                        >{role.name}</option
-                                                    >
-                                                {/each}
-                                            </select>
-                                            {#if filteredRoles.length === 0}
-                                                <p class="no-roles-found">No roles found. Try another search term.</p>
-                                            {/if}
-                                        </div>
-
-                                        <div class="role-details">
-                                            {#if selectedRoleId}
-                                                {#each filteredRoles.filter((r) => r.id === selectedRoleId) as selectedRole}
-                                                    <div class="selected-role-info">
-                                                        <h4>{selectedRole.name}</h4>
-                                                        {#if selectedRole.description}
-                                                            <p>{selectedRole.description}</p>
-                                                        {/if}
-                                                    </div>
-                                                {/each}
-                                            {/if}
-                                        </div>
-
-                                        <div class="action-buttons">
-                                            <button
-                                                class="btn btn-secondary"
-                                                on:click={() => showRoleSelector = false}
-                                                disabled={isAddingRole}
-                                            >
-                                                Cancel
-                                            </button>
-                                            <button
-                                                class="btn btn-primary"
-                                                on:click={handleAddRole}
-                                                disabled={isAddingRole ||
-                                                    !selectedRoleId}
-                                            >
-                                                {isAddingRole
-                                                    ? "Adding..."
-                                                    : "Add Role"}
-                                            </button>
-                                        </div>
+                                            Make this my primary email
+                                        </label>
                                     </div>
-                                {/if}
+                                    <div class="form-actions">
+                                        <button
+                                            class="btn btn-secondary btn-sm"
+                                            on:click={() => {
+                                                showAddEmailForm = false;
+                                                newEmail = "";
+                                                makePrimary = false;
+                                                emailError = null;
+                                            }}
+                                            disabled={isAddingEmail}
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            class="btn btn-primary btn-sm"
+                                            on:click={handleAddEmail}
+                                            disabled={isAddingEmail ||
+                                                !newEmail}
+                                        >
+                                            {isAddingEmail
+                                                ? "Adding..."
+                                                : "Add Email"}
+                                        </button>
+                                    </div>
+                                </div>
+                            {/if}
 
-                                {#if userRoles.length > 0}
-                                    <h3 class="section-title">Manage Your Roles</h3>
-                                    <div class="roles-list">
-                                        {#each userRoles as personRole}
-                                            <div class="role-card">
-                                                <div class="role-info">
-                                                    <span class="role-title">
-                                                        {personRole.role.name}
-                                                    </span>
-                                                </div>
-                                                <button
-                                                    class="btn btn-sm btn-danger"
-                                                    on:click={() => handleRemoveRole(personRole.person_has_role_id)}
-                                                    title="Remove this role"
+                            {#if profile?.emails && profile.emails.length > 0}
+                                <div class="email-list">
+                                    {#each profile.emails as email}
+                                        <div class="email-item">
+                                            <div class="email-info">
+                                                <span class="email-address"
+                                                    >{email.address}</span
                                                 >
-                                                    ✕
-                                                </button>
+                                                {#if email.is_primary}
+                                                    <span
+                                                        class="email-badge primary"
+                                                        >Primary</span
+                                                    >
+                                                {/if}
                                             </div>
-                                        {/each}
-                                    </div>
-                                {/if}
+                                            <div class="email-actions">
+                                                {#if !email.is_primary}
+                                                    <button
+                                                        class="btn btn-sm btn-secondary"
+                                                        on:click={() =>
+                                                            handleSetPrimaryEmail(
+                                                                email.address,
+                                                            )}
+                                                        disabled={isSettingPrimary}
+                                                        title="Set as primary"
+                                                    >
+                                                        Make Primary
+                                                    </button>
+                                                {/if}
+                                                {#if !email.is_primary || profile.emails.length > 1}
+                                                    <button
+                                                        class="btn btn-sm btn-danger"
+                                                        on:click={() =>
+                                                            handleRemoveEmail(
+                                                                email.address,
+                                                            )}
+                                                        title="Remove this email"
+                                                        disabled={email.is_primary &&
+                                                            profile.emails
+                                                                .length === 1}
+                                                    >
+                                                        Remove
+                                                    </button>
+                                                {/if}
+                                            </div>
+                                        </div>
+                                    {/each}
+                                </div>
+                            {:else if !showAddEmailForm}
+                                <p class="empty-message">
+                                    No email addresses found. This shouldn't
+                                    happen!
+                                </p>
                             {/if}
                         </div>
-                    {/if}
+                    </div>
+                {/if}
 
-                    {#if isEditMode}
-                        <div class="profile-actions">
-                            <button
-                                class="btn btn-secondary"
-                                on:click={toggleEditMode}>
-                                Cancel
-                            </button>
-                            <button
-                                class="btn btn-outline danger"
-                                on:click={handleSignout}>
-                                Sign Out
-                            </button>
-                        </div>
-                    {/if}
+                {#if isEditMode}
+                    <div class="profile-actions">
+                        <button
+                            class="btn btn-secondary"
+                            on:click={toggleEditMode}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            class="btn btn-outline danger"
+                            on:click={handleSignout}
+                        >
+                            Sign Out
+                        </button>
+                    </div>
+                {/if}
             </div>
         </div>
     </div>
@@ -838,7 +1165,7 @@
         padding: 2rem;
         box-shadow: var(--shadow-sm);
     }
-    
+
     .profile-tabs {
         display: flex;
         border-bottom: 1px solid var(--border-color);
@@ -846,11 +1173,11 @@
         overflow-x: auto;
         scrollbar-width: none; /* Hide scrollbar for Firefox */
     }
-    
+
     .profile-tabs::-webkit-scrollbar {
         display: none; /* Hide scrollbar for Chrome/Safari */
     }
-    
+
     .tab-button {
         padding: 0.75rem 1.25rem;
         background: none;
@@ -863,32 +1190,32 @@
         transition: all 0.2s ease;
         white-space: nowrap;
     }
-    
+
     .tab-button:hover {
         color: var(--primary-color);
     }
-    
+
     .tab-button.active {
         color: var(--primary-color);
         border-bottom-color: var(--primary-color);
     }
-    
+
     .tab-content {
         padding: 1rem 0;
     }
-    
+
     .roles-header {
         display: flex;
         justify-content: flex-end;
         margin-bottom: 1rem;
     }
-    
+
     .alert-success {
         background-color: rgba(40, 167, 69, 0.1);
         color: #28a745;
         border: 1px solid rgba(40, 167, 69, 0.2);
     }
-    
+
     .required {
         color: #dc3545;
         margin-left: 0.25rem;
@@ -897,8 +1224,6 @@
     .profile-details {
         width: 100%;
     }
-    
-
 
     .profile-field {
         margin-bottom: 1.5rem;
@@ -925,8 +1250,6 @@
         margin-top: 0.25rem;
         font-style: italic;
     }
-
-
 
     .form-section {
         margin-bottom: 2rem;
@@ -1001,17 +1324,17 @@
         gap: 1rem;
         margin-top: 2rem;
     }
-    
+
     .profile-overview {
         padding: 1rem 0;
     }
-    
+
     .section {
         margin-bottom: 2rem;
         padding-bottom: 1rem;
         border-bottom: 1px solid var(--light-gray);
     }
-    
+
     .section:last-child {
         border-bottom: none;
     }
@@ -1201,11 +1524,11 @@
         .profile-actions {
             justify-content: center;
         }
-    
+
         .action-buttons {
             flex-direction: column;
         }
-    
+
         .role-selector {
             padding: 1rem;
         }
@@ -1226,9 +1549,130 @@
         .form-actions {
             flex-direction: column;
         }
-    
+
         .btn {
             width: 100%;
         }
     }
-    </style>
+
+    /* Email management styles */
+    .email-management {
+        padding: 1rem 0;
+    }
+
+    .email-management h4 {
+        margin: 0;
+        font-size: 1rem;
+        color: #495057;
+    }
+
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+    }
+
+    .primary-email {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem;
+        background-color: #f8f9fa;
+        border-radius: var(--border-radius-sm);
+        border: 1px solid #e9ecef;
+    }
+
+    .email-badge {
+        display: inline-block;
+        padding: 0.25rem 0.5rem;
+        background-color: var(--primary-color);
+        color: white;
+        border-radius: 1rem;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+
+    .add-email-form {
+        background-color: #f8f9fa;
+        padding: 1.5rem;
+        border-radius: var(--border-radius-sm);
+        margin-bottom: 1.5rem;
+        border: 1px solid #e9ecef;
+    }
+
+    .email-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .email-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem;
+        background-color: white;
+        border: 1px solid #e9ecef;
+        border-radius: var(--border-radius-sm);
+    }
+
+    .email-info {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .email-address {
+        font-size: 0.95rem;
+        color: #495057;
+    }
+
+    .email-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .email-badge.primary {
+        background-color: var(--primary-color);
+        color: white;
+    }
+
+    .checkbox-label {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.9rem;
+        color: #495057;
+    }
+
+    .checkbox-label input[type="checkbox"] {
+        width: auto;
+        margin: 0;
+    }
+
+    .empty-message {
+        color: #6c757d;
+        font-style: italic;
+        text-align: center;
+        padding: 2rem 0;
+    }
+
+    .additional-emails-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .additional-emails-list .field-value {
+        padding-left: 1rem;
+        position: relative;
+    }
+
+    .additional-emails-list .field-value::before {
+        content: "•";
+        position: absolute;
+        left: 0;
+        color: #666;
+    }
+</style>

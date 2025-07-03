@@ -253,15 +253,7 @@ export async function getOrganizationMembers(
         // Get all members with person details
         const result = await db.query<[OrganizationMember[]]>(
             `
-      SELECT
-        id,
-        in,
-        out,
-        role,
-        joined_at,
-        (SELECT username, email FROM person WHERE id = in) AS person
-      FROM membership
-      WHERE out = $orgId
+            $orgId<-membership.{id, in, out, role, joined_at, person: <-person.{id, username, email}};
     `,
             { orgId },
         );

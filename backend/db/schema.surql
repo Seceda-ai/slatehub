@@ -6,7 +6,7 @@ DEFINE ACCESS user_access ON DATABASE TYPE RECORD
     CREATE person SET
       username    = string::lowercase($username),
       password    = crypto::argon2::generate($password),
-      email       = string::lowercase($email),
+      emails      = [{ address: string::lowercase($email), is_primary: true }],
       global_role = "user"
   )
   SIGNIN (
@@ -29,9 +29,17 @@ DEFINE FIELD username ON person TYPE string
 
 DEFINE FIELD password ON person TYPE string;
 
-DEFINE FIELD email ON person TYPE string
-  VALUE  string::lowercase($value)
-  ASSERT string::is::email($value);
+DEFINE FIELD emails ON person TYPE array;
+DEFINE FIELD emails.*.address ON person TYPE string
+    ASSERT $value != NONE AND string::is::email($value);
+DEFINE FIELD emails.*.primary ON person TYPE bool;
+
+-- Ensure only one email is marked as primary
+DEFINE FIELD emails ON person
+    ASSERT (
+        -- Count the number of primary emails (should be 0 or 1)
+        array::len(array::filter($value, fn($email) => $email.primary)) <= 1;
+    );
 
 -- Full name field
 DEFINE FIELD full_name ON person TYPE string
@@ -71,7 +79,6 @@ DEFINE FIELD global_role ON person TYPE string
 
 
 DEFINE INDEX idx_person_username ON person COLUMNS username UNIQUE;
-DEFINE INDEX idx_person_email    ON person COLUMNS email    UNIQUE;
 
 -- ORGANIZATION TABLE
 -- add persmissions
