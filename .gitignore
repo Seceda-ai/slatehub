@@ -1,14 +1,8 @@
-# Node.js (Svelte frontend)
-frontend/web/node_modules/
-frontend/web/.svelte-kit/
-frontend/web/build/
-frontend/web/.env.local
-frontend/web/.env.*
-
 # SurrealDB (local DB file)
-backend/db/data/*.db
-backend/db/files/*
-!backend/db/files/.gitkeep
+api/db/data/*.db
+!api/db/.gitkeep
+api/db/files/*
+!api/db/files/.gitkeep
 
 # General .env files
 .env
