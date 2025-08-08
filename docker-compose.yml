@@ -30,38 +30,6 @@ services:
             - slatehub-network
         restart: unless-stopped
 
-    api:
-        build:
-            context: ./api
-            dockerfile: Dockerfile
-        container_name: slatehub-api
-        ports:
-            - "3000:3000"
-        environment:
-            - RUST_LOG=slatehub_api=debug,tower_http=debug
-            - SURREAL_URL=http://surrealdb:8000
-            - MINIO_ENDPOINT=http://minio:9000
-            - MINIO_ACCESS_KEY=slatehub
-            - MINIO_SECRET_KEY=slatehub123
-        depends_on:
-            - surrealdb
-            - minio
-        networks:
-            - slatehub-network
-        restart: unless-stopped
-
-    # Future: Web service when containerized
-    # web:
-    #   build:
-    #     context: ./web
-    #     dockerfile: Dockerfile
-    #   container_name: slatehub-web
-    #   ports:
-    #     - "5173:5173"
-    #   networks:
-    #     - slatehub-network
-    #   restart: unless-stopped
-
 volumes:
     surrealdb-data:
         driver: local
